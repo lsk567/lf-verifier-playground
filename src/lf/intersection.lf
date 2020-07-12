@@ -1,0 +1,282 @@
+/**
+ * An LF program of an street intersection with
+ * a traffic light (with 3 colors, red, green, and yellow) 
+ * and a pedestrian light (with 2 colors, red and green).
+ * For the purpose of simulation, this intersection runs
+ * very fast. The traffic light has a 5-second red light, 
+ * 4-second green light and a 1-second yellow light after the green.
+ * The pedestrian light depends on the status of the traffic light.
+ * It displays red when the traffic light is green or yellow and
+ * displays green when the traffic light is red.
+ *
+ * There are 4 reactors in the system: Intersection,
+ * Controller, CLight (traffic light), and PLight (pedestrian light).
+ * The Intersection reactor is the main reactor, which includes
+ * the other reactors and defines connections between them.
+ * The following details the dependency of the 3 sub-reactors:
+ *
+ * Controller -> CLight (car) -> PLight (pedestrian)
+ *
+ * where Controller has a timer that sends out a periodic
+ * "flip" event every 5 seconds in logical time. After 
+ * the traffic light receives the event, it "flips" its state
+ * from 0 to 1 or from 1 to 0, where 0 means red light and 1
+ * means green light. Note that yellow light in this model is
+ * the ending stage of a green light.
+ *
+ * In this example, 6 types of properties are illustrated:
+ * 1. constraints on state variables
+ * 2. presence of output events
+ * 3. patterns of output events
+ * 4. invariants
+ * 5. constraints on event rate
+ * 6. deadline satisfiability
+ *
+ * More properties to investigate:
+ * 7. a FSM of the macro behaviors (modes) of the reactor system.
+      For example, a traffic light system can have 2 modes:
+      - CarPass (car light green then yellow, pedestrian red)
+      - PedestrianPass (car light red, pedestrian green)
+ * 8. (TODO) timing inconsistency in federated reactors
+ *    where in logical time, we can never have both lights green,
+ *    but in physical time, we can. Reasoning about STP (lower bound)
+ *    and deadline (upper bound).
+ *    TODO: come up with a concrete example to demonstrate
+ *
+ * To run this example:
+ * 1. lfc intersection.lf (assuming LF is installed)
+ * 2. bin/intersection
+ *
+ * TODO: 
+ * 1. simulate pedestrian's request to pass
+ * 2. simulate a dynamic Controller (potentially ML-driven)
+ */
+
+// TODO: investigate fast-mode in LF
+target C;
+
+reactor Controller {
+    state count:int(0); // Count periodic events from timer
+    output flip:int;
+
+    // A timer that sends a "t" event every 5 seconds
+    timer t(0, 5 sec);
+    
+    // Once a "t" event appears,
+    // increment the counter.
+    // This simulates the discrete behavior of
+    // the traffic light.
+    reaction(t) -> flip {=
+        (self->count)++;
+
+        // Sends a "flip" event with the value of count
+        // to the downstream reactor CLight.
+        set(flip, self->count);
+
+        printf("Timer sends a flip signal.\n");
+    =}
+}
+
+// Traffic light with 3 colors: Green, Yellow, Red
+/**
+ * Property 1 (patterns of output events)
+ * The actions scheduled by this reactor must follow one
+ * specific order in a specified logical time interval.
+ * 
+ * In this case, the traffic light has to turn from red
+ * to green, then to yellow in a 10-second interval.
+ * Since the timer sends an event every 5 seconds, a
+ * 10-second interval can capture the whole cycle.
+ *
+ * Specification annotation:
+ * TODO: Linear temporal logic, CTL
+ *
+ * Note: currently using metric temporal logic (MTL)
+ *      Model real time using int in UCLID5, or use real type.
+ *      Model time using UCLID5's discrete step.
+ *      Potentially extend UCLID5
+ *      Use GameTime for timing checks
+ *
+ * @order forall interval(10 sec) : logical time. red => green => yellow
+ *
+ * TODO: look into STL (signal temporal logic)
+ * compare STL with TESL
+ */
+reactor CLight {
+    input in:int;
+    output flip:int;
+
+    state count:int(0);
+    state s:int(0);
+
+    logical action red;
+    logical action green;
+    // Schedule a 4-second-delayed yellow light.
+    logical action yellow(4 sec);
+
+    // Note: when the traffic light goes from green to red,
+    // there is a 3-second yellow in between. But when it goes
+    // from red to green, yellow is not needed.
+    /*
+     * Property 2 (constraints on state variables): 
+     * Assert properties on state variables in a reactor
+     * before and after the execution of a reaction.
+     *
+     * In this case, state 0 (red light) must change to 1 (green light),
+     * and vice versa, after the execution of the reaction.
+     *
+     * Specification annotation:
+     * @requires in = 0 \/ in = 1
+     * @ensures (in = 0 -> s = 1) \/ (in = 1 -> s = 0)
+     *
+     * Note: input might be absent. Need to find a way to encode that:
+     * undefined.
+     */
+    /**
+     * Property 3 (presence of output events):
+     * Enforce the correct behavior of a reaction
+     * by reasoning about the output events of a reaction.
+     *
+     * In this case, when the execution finishes, a "green" or "red" action
+     * will be produced (not both), along with a "flip" event with int type. 
+     * 
+     * Specification annotation:
+     * TODO: specify at least 1 exists.
+     *
+     * Note: write this LTL property, use invariant
+     *
+     * @ensures forall t : logical time. (is_present(green) \/ is_present(red)) /\ 
+            !(is_present(green) /\ is_present(red)) /\ is_present(flip)
+     * 
+     * (alternatively)
+     * @ensures (is_odd(count) -> (is_present(green) /\ !is_present(red)) /\ is_present(flip)) \/
+     *      (is_even(count) -> (is_present(red) /\ !is_present(green)) /\ is_present(flip))
+     */
+    /**
+     * Property 4 (constraints on event rate):
+     * The rate of an event output cannot exceed a given bound.
+     *
+     * In this case, we need to make sure that the traffic light
+     * does not switch too frequently, by bounding the rate of change
+     * to 15 times per minute. This property is trivial in this example;
+     * however, if the controller is ML-driven and makes real-time decisions,
+     * such a property can help set a reasonable bound for the ML model.
+     * Changing colors too frequently can be confusing and dangerous.
+     *
+     * Note: 60 discrete steps required in UCLID5. Break it down into lemmas
+     * that require fewer steps. K-induction.
+     *
+     * Specification annotation:
+     * @rate forall interval(60 sec) : logical time. event_count(flip) < 15
+     *
+     * TODO: if pedestrian presses the button at the wrong time, what would the model do.
+     */
+    reaction(in) -> green, red, flip {=
+        self->count = in;
+        
+        // Check the current state of the traffic light
+        // and switch to the opposite color (yellow is
+        // considered the ending part of green).
+        if (self->s == 0) {
+            self->s = 1;
+            schedule(green, 0);
+        }
+        else {
+            self->s = 0;
+            schedule(red, 0);
+        }
+        
+        // Output a "flip" event to the pedestrian light
+        // with the current count stored in the input "in"
+        set(flip, in);
+    =}
+
+    reaction(red) {=
+        printf("%i: Traffic Light    -> RED\n", self->count);
+    =}
+
+    reaction(green) -> yellow {=
+        printf("%i: Traffic Light    -> GREEN\n", self->count);
+
+        // Yellow is a special kind of green light
+        // since it still allows cars to pass the intersection
+        schedule(yellow, 0);
+    =}
+
+    reaction(yellow) {=
+        printf("%i: Traffic Light    -> YELLOW\n", self->count);
+    =}
+}
+
+// Pedestrian light with 2 colors: Green, Red
+reactor PLight {
+    input in:int;
+
+    state count:int(0);
+    state s:int(1); // 0 = red, 1 = green.
+
+    // Schedule a green event with a 1-second delay,
+    // for safety purposes.
+    logical action green(1 sec);
+    logical action red;
+
+    reaction(in) -> green, red {=
+        self->count = in;
+
+        if (self->s == 0) {
+            self->s = 1;
+            schedule(green, 0);
+        }
+        else {
+            self->s = 0;
+            schedule(red, 0);
+        }
+    =}
+
+    /**
+     * Property 5 (deadline satisfiability):
+     * If the deadline is guaranteed satisfied => remove handler
+     * (keeping a handler could still be helpful, to investigate)
+     * If the deadline is guaranteed violated => update deadline
+     * If unknown => require a handler
+     *
+     * Default check, no annotation needed.
+     */
+    // Note: check if deadline, might not be a good fit for UCLID5
+    reaction(red) {=
+        printf("%i: Pedestrian Light -> RED\n", self->count);
+    =} deadline (1500000 msec) {=
+        // Deadline handler
+        printf("Deadline is missed!\n");
+    =}
+
+    reaction(green) {=
+        printf("%i: Pedestrian Light -> GREEN\n", self->count);
+    =}
+}
+
+
+/**
+ * Property 6 (invariants):
+ * Pedestrian light must always be opposite to traffic light.
+ *
+ * Specification annotation:
+ * @inv t.s = !p.s
+ *
+ * More invariants: 
+ * - a traffic light should never have more than 1 light on.
+ * - lights should never be all off.
+ */
+main reactor Intersection {
+    c = new Controller();
+    cl = new CLight();
+    pl = new PLight();
+
+    // Connect Controller's output "flip"
+    // to CLight's input "in"
+    c.flip -> cl.in;
+
+    // Connect CLight's output "flip"
+    // to PLight's input "in"
+    cl.flip -> pl.in;
+}

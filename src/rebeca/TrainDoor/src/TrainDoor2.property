@@ -1,0 +1,11 @@
+property {
+	define {
+		unLocked = !door.is_locked;
+		Locked = door.is_locked;
+		Moving = train.moving;
+		Stop = !train.moving;
+	}
+	Assertion {
+		Assertion0: !(Moving && unLocked);
+	}
+}

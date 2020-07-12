@@ -1,0 +1,70 @@
+reactiveclass Controller(5) {
+	knownrebecs {
+		Door door;
+		Train train;
+	}
+	
+	statevars {
+		boolean moveP;
+	}
+	
+	Controller() {
+		moveP = true;
+		self.external_move();
+	}
+	
+	msgsrv external_move() {
+		int d = ?(0, 50);
+		int x = ?(51, 99);
+		int extd = 80;
+		
+		if (moveP) {
+			door.lock() after(d);
+			train.move() after(x);
+		} else {
+			door.unlock() after(x);
+			train.stop() after(d);
+		}
+		moveP = !moveP;
+		
+		// The delay of 10 is hardcoded here.
+		// To make it nondet.
+		self.external_move() after(extd);
+	}
+}
+
+reactiveclass Train(10) {
+	statevars {
+		boolean moving;
+	}
+	Train() {
+		moving = false;
+	}
+	@priority(1) msgsrv stop() {
+		moving = false;
+	}
+	@priority(2) msgsrv move() {
+		moving = true;
+	}
+}
+
+reactiveclass Door(10) {
+	statevars {
+		boolean is_locked;
+	}
+	Door() {
+		is_locked = false;
+	}
+	@priority(1) msgsrv lock() {
+		is_locked = true;
+	}
+	@priority(2) msgsrv unlock() {
+		is_locked = false;
+	}
+}
+
+main {
+	@priority(1) Controller controller(door, train):();
+	@priority(2) Train train():();
+	@priority(2) Door door():();
+}

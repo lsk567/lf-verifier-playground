@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<declaration>// Place global declarations here.
+broadcast chan d_flip, t_flip;</declaration>
+	<template>
+		<name x="5" y="5">Controller</name>
+		<declaration>// Place local declarations here.
+clock c_clock;</declaration>
+		<location id="id0" x="-416" y="-119">
+			<name x="-493" y="-136">Press_1</name>
+			<committed/>
+		</location>
+		<location id="id1" x="-246" y="-118">
+			<name x="-256" y="-152">Locked</name>
+			<committed/>
+		</location>
+		<location id="id2" x="-85" y="-118">
+			<name x="-76" y="-152">Moving</name>
+			<label kind="invariant" x="-110" y="-170">c_clock &lt; 10</label>
+			<label kind="comments" x="102" y="-119">The guard c_clock &gt; 5 is required
+so that the button isn't pressed before 
+network delays finish; however, one can 
+claim that this is also a vulnerability that 
+should be addressed.</label>
+		</location>
+		<location id="id3" x="93" y="42">
+			<name x="110" y="51">Press_2</name>
+			<committed/>
+		</location>
+		<location id="id4" x="-85" y="42">
+			<name x="-102" y="59">Stopped</name>
+			<committed/>
+		</location>
+		<location id="id5" x="-246" y="42">
+			<name x="-272" y="59">Unlocked</name>
+			<label kind="invariant" x="-289" y="76">c_clock &lt; 10</label>
+		</location>
+		<init ref="id0"/>
+		<transition>
+			<source ref="id5"/>
+			<target ref="id0"/>
+			<label kind="guard" x="-399" y="-25">c_clock &gt; 5</label>
+			<label kind="assignment" x="-382" y="-8">c_clock = 0</label>
+		</transition>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id5"/>
+			<label kind="synchronisation" x="-187" y="17">d_flip!</label>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id4"/>
+			<label kind="synchronisation" x="-25" y="17">t_flip!</label>
+		</transition>
+		<transition>
+			<source ref="id2"/>
+			<target ref="id3"/>
+			<label kind="guard" x="-8" y="-85">c_clock &gt; 5</label>
+			<label kind="assignment" x="0" y="-68">c_clock = 0</label>
+		</transition>
+		<transition>
+			<source ref="id1"/>
+			<target ref="id2"/>
+			<label kind="synchronisation" x="-187" y="-144">t_flip!</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="synchronisation" x="-348" y="-144">d_flip!</label>
+		</transition>
+	</template>
+	<template>
+		<name>Door</name>
+		<declaration>clock d_clock;</declaration>
+		<location id="id6" x="-187" y="-68">
+			<name x="-272" y="-76">Unlocked</name>
+		</location>
+		<location id="id7" x="76" y="-68">
+			<name x="93" y="-76">Locked</name>
+		</location>
+		<location id="id8" x="-59" y="-153">
+			<name x="-93" y="-187">Network_delay_1</name>
+			<label kind="invariant" x="-93" y="-204">d_clock &lt; 1</label>
+		</location>
+		<location id="id9" x="-59" y="17">
+			<name x="-102" y="34">Network_delay_2</name>
+			<label kind="invariant" x="-93" y="51">d_clock &lt; 1</label>
+		</location>
+		<init ref="id6"/>
+		<transition>
+			<source ref="id8"/>
+			<target ref="id7"/>
+		</transition>
+		<transition>
+			<source ref="id9"/>
+			<target ref="id6"/>
+		</transition>
+		<transition>
+			<source ref="id7"/>
+			<target ref="id9"/>
+			<label kind="synchronisation" x="17" y="-25">d_flip?</label>
+			<label kind="assignment" x="0" y="-8">d_clock = 0</label>
+		</transition>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id8"/>
+			<label kind="synchronisation" x="-169" y="-127">d_flip?</label>
+			<label kind="assignment" x="-195" y="-144">d_clock = 0</label>
+		</transition>
+	</template>
+	<template>
+		<name>Train</name>
+		<declaration>clock t_clock;</declaration>
+		<location id="id10" x="-8" y="-77">
+			<name x="-42" y="-111">Network_delay_1</name>
+			<label kind="invariant" x="-42" y="-128">t_clock &lt; 1</label>
+		</location>
+		<location id="id11" x="127" y="8">
+			<name x="144" y="0">Moving</name>
+		</location>
+		<location id="id12" x="-8" y="93">
+			<name x="-51" y="110">Network_delay_2</name>
+			<label kind="invariant" x="-42" y="127">t_clock &lt; 1</label>
+		</location>
+		<location id="id13" x="-136" y="8">
+			<name x="-212" y="0">Stopped</name>
+		</location>
+		<init ref="id13"/>
+		<transition>
+			<source ref="id10"/>
+			<target ref="id11"/>
+		</transition>
+		<transition>
+			<source ref="id12"/>
+			<target ref="id13"/>
+		</transition>
+		<transition>
+			<source ref="id11"/>
+			<target ref="id12"/>
+			<label kind="synchronisation" x="68" y="51">t_flip?</label>
+			<label kind="assignment" x="51" y="68">t_clock = 0</label>
+		</transition>
+		<transition>
+			<source ref="id13"/>
+			<target ref="id10"/>
+			<label kind="synchronisation" x="-118" y="-51">t_flip?</label>
+			<label kind="assignment" x="-144" y="-68">t_clock = 0</label>
+		</transition>
+	</template>
+	<system>// Place template instantiations here.
+// Process = Template();
+// List one or more processes to be composed into a system.
+system Controller, Door, Train;
+    </system>
+	<queries>
+		<query>
+			<formula>Pr[&lt;=100](&lt;&gt; Door.Unlocked and Train.Network_delay_2)</formula>
+			<comment>Estimate the probability that the door is unlocked while train is moving before 200 time units.</comment>
+		</query>
+		<query>
+			<formula>A[] !(Door.Unlocked and Train.Network_delay_2)</formula>
+			<comment>The unwanted case is that the door is unlocked while train is moving
+(which means the stop is still transmitting through the network).
+Here we assert that this case never happens for all times.</comment>
+		</query>
+	</queries>
+</nta>

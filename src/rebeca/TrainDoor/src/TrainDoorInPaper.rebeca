@@ -1,0 +1,107 @@
+// Controller that sends move to Train and lock to Door.
+// No ordering between Door and Train
+
+reactiveclass Environment(20) {
+    knownrebecs{
+      Door door;
+      Controller controller;
+	}
+    statevars{
+      // int envv;
+    }
+    Environment() {
+        self.environment();
+        // envv = 0;
+    } 
+    msgsrv environment() {
+        // envv = 0;
+        if (?(true,false)) { 
+           door.external_open();
+           // envv = 1;
+        }
+        boolean tmp = ?(true,false);
+        if (?(true,false)) {
+           if (tmp) {
+              controller.external_move(true);
+              // envv = envv + 2;
+            }else {
+              controller.external_move(false);
+              // envv = envv + 4;
+            }  
+          }  
+           
+        self.environment() after(100);
+    }
+}
+reactiveclass Controller(10) {
+    knownrebecs{
+        Door door;
+        Train train;
+    }
+    statevars {} 
+    Controller() {}
+    msgsrv external_move(boolean movePP) {
+    	int d = ?(0, 50); // Deadline of lock and stop.
+    	int x = ?(51, 99);  // Delay (with implicit deadline) of unlock and move.
+    	if (movePP) {
+            door.lock(true) after(d);
+            train.move(true) after(x);
+        } else {
+        	door.unlock(true) after(x);
+        	train.stop(true) after(d);
+        }
+     }
+}
+
+reactiveclass Train(10) {
+    statevars{
+      boolean moving;
+      }
+    Train() {
+       moving = false;
+       }
+    @priority(1)
+    msgsrv stop(boolean tmove) { 
+       moving = false;
+    }
+    @priority(2)
+    msgsrv move(boolean tmove) { 
+       moving = true;
+    }
+}
+
+reactiveclass Door(10) {
+    statevars{
+      boolean is_locked;
+      boolean is_open;
+    }
+     Door() {
+       is_locked = false;
+       is_open = false;
+     }
+    @priority(1)
+    msgsrv lock (boolean lockPar) {
+        is_open = false;
+        is_locked = true;
+    }
+    @priority(2)
+    msgsrv unlock (boolean lockPar) {
+        is_locked = false;
+    }
+    @priority(3)
+     msgsrv external_open () {
+        boolean openP = ?(true,false);
+        if (openP) {
+          if (!is_locked) {
+             is_open = true;
+            }
+          }  
+    }
+}
+
+main {
+     Environment environment(door, controller):();
+     Controller controller(door, train):();
+     Train train():();
+     Door door():();   
+}

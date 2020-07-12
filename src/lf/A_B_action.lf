@@ -1,0 +1,43 @@
+/**
+ * Demonstrate
+ * 1. concurrent reactions are executed 
+ *    in the order of their declarations 
+ */
+
+target C;
+
+reactor A {
+	output _out:int;
+	logical action foo;
+	logical action bar;
+	
+	 reaction(startup) -> _out, foo, bar {=
+		set(_out, 0);
+		schedule(foo, 2);
+		schedule(bar, 1);
+	=}
+	
+	reaction(foo) {=
+        printf("I am foo.\n");
+    =}
+    
+    reaction(bar) {=
+        printf("I am bar.\n");
+    =}
+    
+}
+
+reactor B {
+	input _in:int;
+
+	reaction(_in) {=
+		printf("Received %d from A\n", _in);
+	=}
+}
+
+main reactor Composition {
+	a = new A();
+	b = new B();
+	
+	a._out -> b._in;
+} 

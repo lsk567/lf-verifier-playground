@@ -1,0 +1,345 @@
+<model-checking-report>
+<system-info>
+	<total-spent-time>0</total-spent-time>
+	<reached-states>45</reached-states>
+	<reached-transitions>52</reached-transitions>
+	<consumed-mem>540</consumed-mem>
+</system-info>
+<checked-property>
+	<type>Reachability</type>
+	<name>Deadlock-Freedom and No Deadline Missed</name>
+	<result>assertion failed</result>
+	<message>Assertion0</message>
+<options>
+	<option>Safe mode is enabled</option>
+	<option>TTS</option>
+</options>
+</checked-property>
+<extra-details>
+	<timed-states>15</timed-states>
+	<timed-transitions>22</timed-transitions>
+</extra-details>
+<counter-example-trace>
+<state id="1_0" atomicpropositions="unLocked,Stop," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="0" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="1_0" destination="2_0" executionTime="0" shift="0"> <messageserver sender="controller" owner="controller" title="EXTERNAL_MOVE"/></transition>
+<state id="2_0" atomicpropositions="unLocked,Stop," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="80" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="99" deadline="infinity" sender="controller">move()</message>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="0" deadline="infinity" sender="controller">lock()</message>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="2_0" destination="3_0" executionTime="0" shift="0"> <messageserver sender="controller" owner="door" title="LOCK"/></transition>
+<state id="3_0" atomicpropositions="Locked,Stop," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="80" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="99" deadline="infinity" sender="controller">move()</message>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+		</queue>
+		<now>0</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="3_0" destination="4_0" executionTime="80" shift="0"> <time value="80"/></transition>
+<state id="4_0" atomicpropositions="Locked,Stop," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="80" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="99" deadline="infinity" sender="controller">move()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="4_0" destination="5_0" executionTime="80" shift="0"> <messageserver sender="controller" owner="controller" title="EXTERNAL_MOVE"/></transition>
+<state id="5_0" atomicpropositions="Locked,Stop," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="160" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="80" deadline="infinity" sender="controller">stop()</message>
+			<message arrival="99" deadline="infinity" sender="controller">move()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="131" deadline="infinity" sender="controller">unlock()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="5_0" destination="6_0" executionTime="80" shift="0"> <messageserver sender="controller" owner="train" title="STOP"/></transition>
+<state id="6_0" atomicpropositions="Locked,Stop," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="160" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="99" deadline="infinity" sender="controller">move()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="131" deadline="infinity" sender="controller">unlock()</message>
+		</queue>
+		<now>80</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="6_0" destination="7_0" executionTime="99" shift="0"> <time value="19"/></transition>
+<state id="7_0" atomicpropositions="Locked,Stop," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="160" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>99</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">false</variable>
+		</statevariables>
+		<queue>
+			<message arrival="99" deadline="infinity" sender="controller">move()</message>
+		</queue>
+		<now>99</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="131" deadline="infinity" sender="controller">unlock()</message>
+		</queue>
+		<now>99</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="7_0" destination="8_0" executionTime="99" shift="0"> <messageserver sender="controller" owner="train" title="MOVE"/></transition>
+<state id="8_0" atomicpropositions="Locked,Moving," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="160" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>99</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+		</queue>
+		<now>99</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="131" deadline="infinity" sender="controller">unlock()</message>
+		</queue>
+		<now>99</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="8_0" destination="9_0" executionTime="131" shift="0"> <time value="32"/></transition>
+<state id="9_0" atomicpropositions="Locked,Moving," >
+	<rebec name="controller">
+		<statevariables>
+			<variable name="Controller.moveP" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="160" deadline="infinity" sender="controller">external_move()</message>
+		</queue>
+		<now>131</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="train">
+		<statevariables>
+			<variable name="Train.moving" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+		</queue>
+		<now>131</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+	<rebec name="door">
+		<statevariables>
+			<variable name="Door.is_locked" type="boolean">true</variable>
+		</statevariables>
+		<queue>
+			<message arrival="131" deadline="infinity" sender="controller">unlock()</message>
+		</queue>
+		<now>131</now>
+		<pc></pc>
+		<res></res>
+	</rebec>
+</state>
+<transition source="9_0" destination="assertion failed" executionTime="131" shift="0"> <messageserver sender="controller" owner="door" title="UNLOCK"/></transition>
+<state id="assertion failed" atomicpropositions="assertion failed">
+</state>
+</counter-example-trace>
+</model-checking-report>
