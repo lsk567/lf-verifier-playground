@@ -1,0 +1,166 @@
+module main {
+    type * = Common.*;
+    type * = Finalized.*;
+
+    // Channels between the scheduler and reactors
+    var SourceA_to_S : event_t;
+    var SourceB_to_S : event_t;
+    var SourceC_to_S : event_t;
+    var SourceD_to_S : event_t;
+    var Sink_to_S : event_t;
+    var S_to_SourceA : event_t;
+    var S_to_SourceB : event_t;
+    var S_to_SourceC : event_t;
+    var S_to_SourceD : event_t;
+    var S_to_Sink : event_t;
+    
+    // Finalized
+    var finalize_SourceA_startup : boolean;
+    var finalize_SourceB_startup : boolean;
+    var finalize_SourceC_in      : boolean;
+    var finalize_SourceD_in      : boolean;
+    var finalize_Sink_inA        : boolean;
+    var finalize_Sink_inB        : boolean;
+    var final_to_SourceA         : final_tb_t;
+    var final_to_SourceB         : final_tb_t;
+    var final_to_SourceC         : final_tb_t;
+    var final_to_SourceD         : final_tb_t;
+    var final_to_Sink            : final_tb_t;
+
+    var NULL_EVENT : event_t;
+
+    instance scheduler : Scheduler(SourceA_to_S : (SourceA_to_S),
+                                    SourceB_to_S : (SourceB_to_S),
+                                    SourceC_to_S : (SourceC_to_S),
+                                    SourceD_to_S : (SourceD_to_S),
+                                    Sink_to_S : (Sink_to_S),
+                                    S_to_SourceA : (S_to_SourceA),
+                                    S_to_SourceB : (S_to_SourceB),
+                                    S_to_SourceC : (S_to_SourceC),
+                                    S_to_SourceD : (S_to_SourceD),
+                                    S_to_Sink : (S_to_Sink),
+                                    finalize_SourceA_startup : (finalize_SourceA_startup),
+                                    finalize_SourceB_startup : (finalize_SourceB_startup),
+                                    finalize_SourceC_in : (finalize_SourceC_in),
+                                    finalize_SourceD_in : (finalize_SourceD_in),
+                                    finalize_Sink_inA : (finalize_Sink_inA),
+                                    finalize_Sink_inB : (finalize_Sink_inB),
+                                    final_to_SourceA : (final_to_SourceA),
+                                    final_to_SourceB : (final_to_SourceB),
+                                    final_to_SourceC : (final_to_SourceC),
+                                    final_to_SourceD : (final_to_SourceD),
+                                    final_to_Sink : (final_to_Sink));
+    instance a : Reactor_SourceA(t : (scheduler.t),
+                                    __in__ : (S_to_SourceA),
+                                    __out__ : (SourceA_to_S),
+                                    finalized : (final_to_SourceA),
+                                    finalize_SourceA_startup : (finalize_SourceA_startup));
+    instance b : Reactor_SourceB(t : (scheduler.t),
+                                    __in__ : (S_to_SourceB),
+                                    __out__ : (SourceB_to_S),
+                                    finalized : (final_to_SourceB),
+                                    finalize_SourceB_startup : (finalize_SourceB_startup));
+    instance c : Reactor_SourceC(t : (scheduler.t),
+                                    __in__ : (S_to_SourceC),
+                                    __out__ : (SourceC_to_S),
+                                    finalized : (final_to_SourceC),
+                                    finalize_SourceC_in : (finalize_SourceC_in));
+    instance d : Reactor_SourceD(t : (scheduler.t),
+                                    __in__ : (S_to_SourceD),
+                                    __out__ : (SourceD_to_S),
+                                    finalized : (final_to_SourceD),
+                                    finalize_SourceD_in : (finalize_SourceD_in));
+    instance s : Reactor_Sink(t : (scheduler.t),
+                                    __in__ : (S_to_Sink),
+                                    __out__ : (Sink_to_S),
+                                    finalized : (final_to_Sink),
+                                    finalize_Sink_inA : (finalize_Sink_inA),
+                                    finalize_Sink_inB : (finalize_Sink_inB));
+
+    init {
+        NULL_EVENT = { -1, NULL, NULL, NULL_NULL, -1, false };
+        SourceA_to_S = NULL_EVENT;
+        SourceB_to_S = NULL_EVENT;
+        SourceC_to_S = NULL_EVENT;
+        SourceD_to_S = NULL_EVENT;
+        Sink_to_S = NULL_EVENT;
+        S_to_SourceA = NULL_EVENT;
+        S_to_SourceB = NULL_EVENT;
+        S_to_SourceC = NULL_EVENT;
+        S_to_SourceD = NULL_EVENT;
+        S_to_Sink = NULL_EVENT;
+
+        finalize_SourceA_startup = false;
+        finalize_SourceB_startup = false;
+        finalize_SourceC_in = false;    
+        finalize_SourceD_in = false;    
+        finalize_Sink_inA = false;       
+        finalize_Sink_inB = false;       
+
+        // finalized = { false, false, false, false, false, false };
+        final_to_SourceA = { false, false, false, false, false, false };
+        final_to_SourceB = { false, false, false, false, false, false };
+        final_to_SourceC = { false, false, false, false, false, false };
+        final_to_SourceD = { false, false, false, false, false, false };
+        final_to_Sink =    { false, false, false, false, false, false };
+    }
+
+    next {
+        next(scheduler);
+        next(a);
+        next(b);
+        next(c);
+        next(d);
+        next(s);
+    }
+
+    property[LTL] value_delivered_at_the_right_time : G(scheduler.t == 0
+                                                        && Sink_to_S._5 == 11);
+
+    control {
+        v = bmc(30);
+        check;
+        print_results;
+        v.print_cex(
+                    scheduler.t,
+                    scheduler.event_q.contents, 
+                    scheduler.event_q.op,
+                    scheduler.event_q.data,
+                    scheduler.event_q.count,
+                    scheduler.reaction_q.contents, 
+                    scheduler.reaction_q.op,
+                    scheduler.reaction_q.data,
+                    scheduler.reaction_q.count,
+                    scheduler.eq_op,
+                    scheduler.eq_data,
+                    scheduler.eq_out,
+                    scheduler.rq_op,
+                    scheduler.rq_data,
+                    scheduler.rq_out,
+                    scheduler.S_to_SourceA,
+                    scheduler.S_to_SourceB,
+                    scheduler.S_to_SourceC,
+                    scheduler.S_to_SourceD,
+                    scheduler.S_to_Sink,
+                    scheduler.SourceA_to_S,
+                    scheduler.SourceB_to_S,
+                    scheduler.SourceC_to_S,
+                    scheduler.SourceD_to_S,
+                    scheduler.Sink_to_S,
+                    a.__in__,
+                    a.__out__,
+                    b.__in__,
+                    b.__out__,
+                    c.__in__,
+                    c.__out__,
+                    d.__in__,
+                    d.__out__,
+                    s.__in__,
+                    s.__out__,
+                    s.inA,
+                    s.inB,
+                    final_to_SourceA
+        );
+    }
+}
+

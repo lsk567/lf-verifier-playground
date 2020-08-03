@@ -1,0 +1,123 @@
+/**
+ * Array not properly updated to show in a cex.
+ */
+
+module PQueue
+{
+    type op_t = enum { PUSH, POP };
+    type index_t = integer;
+    type count_t = integer;
+    type data_t = integer;
+    type queue_t = [index_t]data_t;
+    
+    const END : integer = 4;
+    const NULL : integer = 65535;
+
+    input op : op_t;
+    input data : data_t;
+
+    var contents : queue_t;
+    var count : integer; // The last available spot
+
+    var __done__ : boolean;
+
+    procedure pushQ()
+        returns (
+            contentsP : queue_t,
+            countP : index_t
+        )
+        modifies __done__;
+        requires ( op == PUSH ); // OP must be PUSH
+        requires ( count >= 0 && count < END + 1 ); // PQueue cannot be full. 
+        // Give the solver the relationship between count and contents.
+        // FIXME: inaccurate formulation.
+        /*
+        requires (forall (i : integer) ::
+                    (i >= 0 && i < count) ==> contents[i] >= 0);
+        */
+        requires (exists (i : integer) ::
+                    (i >= 0 && i < count) && contents[i] == NULL);
+        // How to encode: array has n elements using FOL?
+
+        // requires ( data == -1 ); // For printout purposes
+        ensures ( countP == count + 2 );
+    {
+        /*
+        // The append approach that works
+        // for normal queue, but not for
+        // pqueue.
+        contentsP = contents[tail -> data];
+        tailP = tail + 1;
+        if (tailP > END) { tailP = 0; }
+        */
+
+        __done__ = false; // To prevent repetitive updates.
+        // contentsP = contents; // Can only assign to return once.
+        for (i : integer) in range(0, END) {
+            if (contents[i] == NULL && !__done__) {
+                contentsP = contents[i -> data];
+                countP = count + 1;
+                __done__ = true;
+            }
+        }
+        // Need to explicitly specify the values in the next state.
+        if (!__done__) {
+            contentsP = contents;
+            countP = count;
+        }
+    }
+
+    init {
+        count = 0;
+        for (i : integer) in range(0, END) {
+            contents[i] = NULL;
+        }
+
+        __done__ = false;
+    }
+
+    next {
+        case
+            (op == PUSH) : {
+                call (contents', count') = pushQ();
+            }
+        esac;
+    }
+
+    control {
+        vPush = verify(pushQ);
+        check;
+        print_results;
+        vPush.print_cex();
+    }
+}
+
+module main {
+    type * = PQueue.*;
+    
+    var _op : op_t;
+    var _data : data_t;
+
+    instance q : PQueue(op : (_op), data : (_data));
+
+    init {
+        _op = PUSH;
+        _data = 0;
+    }
+
+    next {
+        _op' = PUSH;
+        _data' = _data + 1;
+        next(q);
+    }
+
+    control {
+        v = unroll(8);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
+
+
+

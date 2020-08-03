@@ -1,0 +1,232 @@
+/**
+ * A priority queue implementation that pushes and pops
+ * one event at a time.
+ *
+ * When verifying the main module that contains the "unroll"
+ * command, comment out the conditions in the PQueue module;
+ * otherwise strange outputs will appear.
+ *
+ * Verify() stops working because of the use of tuple. But
+ * unroll still works.
+ */
+module Common {
+    // FILE_SPECIFIC
+    type reactor_id_t = enum { A, B, NULL };
+    type trigger_id_t = enum { A_OUT, B_IN, N_NULL };
+    type token_t      = integer; // To support "anytype"
+
+    // COMMON
+    type instant_t    = integer;
+    type is_present_t = boolean;
+
+    /**
+     * Use tuple instead of record for easy instantiation,
+     * the event_t tuple is defined as [from_reactor_id,
+     * to_reactor_id, time_of_release, trigger_id, token]
+     *
+     * Note: if type overload is enabled, the token_t field
+     * can be reduced to 1 field. Otherwise, multiple token_t
+     * fields are needed depending on the LF program.
+     */
+    type event_t = {
+                     instant_t,     // Tag
+                     reactor_id_t,  // From
+                     reactor_id_t,  // To
+                     trigger_id_t,  // Trigger
+                     token_t,       // Token
+                     is_present_t   // Is_present
+                   };
+
+    /*
+    // TODO: replace concrete __null__ instantiation with abstract const.
+    const null_event : event_t;
+    axiom (forall (e : event_t) :: null_event._1 > e._1);
+    */
+}
+
+module PQueue
+{
+    type * = Common.*;
+
+    type op_t = enum { PUSH, POP };
+    type index_t = integer;
+    type count_t = integer;
+    type data_t = event_t;
+    type queue_t = [index_t]data_t;
+    
+    const END : integer = 4; // The size of pqueue is 5.
+    var NULL_EVENT : data_t;
+
+    input op : op_t;
+    input data : data_t;
+
+    output out : data_t; // Output from popQ()
+
+    var contents : queue_t;
+    var count : integer; 
+
+    var __done__ : boolean;
+    var __min__ : data_t;
+    var __min_idx__ : index_t;
+
+    define in_queue(q : [index_t]data_t, v : data_t) : boolean =
+        (exists (i : index_t) ::
+            (i >= 0 && i <= END) && q[i] == v);
+
+    procedure pushQ()
+        returns (
+            contentsP : queue_t,
+            countP : integer
+        )
+        modifies __done__;
+        requires ( op == POP ); // Useful for printing execution traces
+        /*
+        requires ( op == PUSH ); // OP must be PUSH
+        requires ( count >= 0 && count < END + 1 ); // PQueue cannot be full. 
+        // The meaning of not being full.
+        requires (exists (i : integer) ::
+                    (i >= 0 && i < count) && contents[i] == NULL_EVENT);
+        // Require the array does not contain the element
+        requires ( !in_queue(contents, data) );
+        // When these two post-conditions are disabled,
+        // the queue output behaves normally.
+        ensures ( countP == count + 1 );
+        ensures ( in_queue(contentsP, data) );
+        */
+    {
+        __done__ = false; // To prevent repetitive updates.
+        // contentsP = contents; // Can only assign to return once.
+        for (i : integer) in range(0, END) {
+            if (contents[i] == NULL_EVENT && !__done__) {
+                contentsP = contents[i -> data];
+                countP = count + 1;
+                __done__ = true;
+            }
+        }
+        // Need to explicitly specify the values in the next state.
+        if (!__done__) {
+            contentsP = contents;
+            countP = count;
+        }
+    }
+
+    procedure popQ()
+        returns (
+            contentsP : [index_t]data_t,
+            countP : integer,
+            outP : data_t
+        )
+        modifies __min__, __min_idx__;
+        requires ( op == PUSH ); // Useful for printing execution traces
+        /*
+        requires (op == POP);
+        // Must not be empty
+        requires ( exists (i : integer) ::
+                    (i >= 0 && i <= END) &&
+                    contents[i]._1 >= 0 );
+        ensures (countP == count - 1);
+        */
+    {
+        __min__ = contents[0];
+        __min_idx__ = 0; 
+
+        // Find the minimum
+        for (i : integer) in range(0, END) {
+            if (contents[i] != NULL_EVENT) {
+                if (__min__ == NULL_EVENT) {
+                    __min__ = contents[i];
+                    __min_idx__ = i;
+                }
+                else {
+                    if (contents[i]._1 < __min__._1) {
+                        __min__ = contents[i];
+                        __min_idx__ = i;
+                    }
+                }
+            }
+        }
+
+        outP = __min__;
+        contentsP = contents[__min_idx__ -> NULL_EVENT];
+        /**
+         * We don't need to address the __min__ == -1 case,
+         * since the pre-condition says the queue is not empty.
+         */
+        countP = count - 1;
+    }
+
+    init {
+        count = 0;
+        contents[0] = { 2, A, B, A_OUT, 1, true };
+        contents[1] = { 1, A, B, A_OUT, 5, true };
+        for (i : integer) in range(2, END) {
+            contents[i] = NULL_EVENT;
+        }
+
+        NULL_EVENT = { -1, NULL, NULL, N_NULL, -1, false };
+        __done__ = false;
+        __min__ = NULL_EVENT;
+    }
+
+    next {
+        case
+            (op == PUSH) : {
+                call (contents', count') = pushQ();
+            }
+            (op == POP) : {
+                call (contents', count', out') = popQ();
+            }
+        esac;
+    }
+
+    control {
+        vPush = verify(pushQ);
+        vPop = verify(popQ);
+        check;
+        print_results;
+        vPush.print_cex();
+        vPop.print_cex();
+    }
+}
+
+module main {
+    type * = PQueue.*;
+    
+    var _op : op_t;
+    var _data : data_t;
+    var _out : data_t; // Not displayed in the print-out unless explicitly
+                        // specified in print_cex()
+
+    var NULL_EVENT : data_t;
+
+    instance q : PQueue(op : (_op), data : (_data), out : (_out));
+
+    init {
+        NULL_EVENT = { -1, NULL, NULL, N_NULL, -1, false };
+        _op = PUSH;
+        _data = { 0, A, B, A_OUT, 10, true };
+        _out = NULL_EVENT;
+    }
+
+    next {
+        if (_op == POP) {
+            _op' = PUSH;
+            _data' = { (_data._1 + 1), A, B, A_OUT, 10, true };
+        }
+        else {
+            _op' = POP;
+        }
+
+        next(q);
+    }
+
+    control {
+        v = unroll(10);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
+
+
+

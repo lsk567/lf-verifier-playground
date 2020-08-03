@@ -1,0 +1,177 @@
+module PQueue
+{
+    type op_t = enum { PUSH, POP };
+    type index_t = integer;
+    type count_t = integer;
+    type data_t = integer;
+    type queue_t = [index_t]data_t;
+    
+    const END : integer = 4;
+    const NULL : integer = 65535;
+
+    input op : op_t;
+    input data : data_t;
+
+    output out : data_t;
+
+    var contents : queue_t;
+    var count : integer; // The last available spot
+
+    var __done__ : boolean;
+    var __min__ : integer;
+
+    define in_queue(v : data_t, q : [index_t]data_t) : boolean =
+        (exists (i : index_t) ::
+            (i >= 0 && i <= END) && q[i] == v);
+
+    procedure pushQ()
+        returns (
+            contentsP : queue_t,
+            countP : integer
+        )
+        modifies __done__;
+        requires ( op == PUSH ); // OP must be PUSH
+        requires ( count >= 0 && count < END + 1 ); // PQueue cannot be full. 
+        // The meaning of not being full.
+        requires (exists (i : integer) ::
+                    (i >= 0 && i < count) && contents[i] == NULL);
+        // Require the array does not contain the element
+        requires ( !in_queue(data, contents) );
+        // requires ( data == -1 ); // For printout purposes
+        // ensures ( countP == count + 1 );
+        // ensures ( in_queue(data, contentsP) );
+    {
+        /*
+        // The append approach that works
+        // for normal queue, but not for
+        // pqueue.
+        contentsP = contents[tail -> data];
+        tailP = tail + 1;
+        if (tailP > END) { tailP = 0; }
+        */
+
+        __done__ = false; // To prevent repetitive updates.
+        // contentsP = contents; // Can only assign to return once.
+        for (i : integer) in range(0, END) {
+            if (contents[i] == NULL && !__done__) {
+                contentsP = contents[i -> data];
+                countP = count + 1;
+                __done__ = true;
+            }
+        }
+        // Need to explicitly specify the values in the next state.
+        if (!__done__) {
+            contentsP = contents;
+            countP = count;
+        }
+    }
+
+    procedure popQ()
+        returns (
+            contentsP : [index_t]data_t,
+            countP : integer,
+            out : data_t
+        )
+        modifies __min__, __done__;
+        requires (op == POP);
+        // Must not be empty
+        requires ( exists (i : integer) ::
+                    contents[i] < NULL );
+        ensures (countP == count - 1);
+    {
+        __min__ = contents[0];
+        __done__ = false;
+
+        // Find the minimum
+        for (i : integer) in range(0, END) {
+            if (contents[i] < __min__) {
+                __min__ = contents[i];
+            }
+        }
+
+        // Pop min from queue
+        for (i : integer) in range(0, END) {
+            if (contents[i] == __min__ &&
+                contents[i] != NULL && !__done__) {
+                contentsP = contents[i -> NULL];
+                countP = count - 1;
+                out = contents[i];
+                __done__ = true;
+            }
+        }
+
+        if (!__done__) {
+            contentsP = contents;
+            countP = count;
+            out = NULL;
+        }
+    }
+
+    init {
+        count = 0;
+        for (i : integer) in range(0, END) {
+            contents[i] = NULL;
+        }
+
+        __done__ = false;
+        __min__ = 65535;
+    }
+
+    next {
+        case
+            (op == PUSH) : {
+                call (contents', count') = pushQ();
+            }
+            (op == POP) : {
+                call (contents', count', out') = popQ();
+            }
+        esac;
+    }
+
+    control {
+        /*
+         * Enabling/disabling vPush changes verification output
+         */
+        // vPush = verify(pushQ);
+        vPop = verify(popQ);
+        check;
+        print_results;
+        // vPush.print_cex();
+        vPop.print_cex();
+    }
+}
+
+module main {
+    type * = PQueue.*;
+    
+    var _op : op_t;
+    var _data : data_t;
+
+    instance q : PQueue(op : (_op), data : (_data));
+
+    init {
+        _op = PUSH;
+        _data = 0;
+    }
+
+    next {
+        if (_op == POP) {
+            _op' = PUSH;
+            _data' = _data + 1;
+        }
+        else {
+            _op' = POP;
+        }
+        next(q);
+    }
+
+    control {
+        v = unroll(8);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
+
+
+

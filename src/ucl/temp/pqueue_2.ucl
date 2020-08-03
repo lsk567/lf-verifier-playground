@@ -1,0 +1,96 @@
+module PQueue {
+    type op_t = enum { push, pop };
+    type index_t = integer;
+    type count_t = integer;
+    type data_t = { integer, integer }; // { priority, val }
+    type queue_t = [index_t]data_t;
+
+    const SIZE : integer = 4;
+
+    // Public
+    var contents : queue_t;
+    var count : count_t;
+    var full : boolean;
+
+    // Private
+	var __max_idx__ : integer; // To store max queue index in popQ()
+
+    input op : op_t;
+    input _in : data_t;
+
+    output _out : data_t;
+
+	init {
+        assume(forall (i : integer) :: (i >= 0 && i < SIZE) &&
+                contents[i]._1 == 0);
+		count  = 0;
+		full   = false;
+		__max_idx__    = 0;
+	}
+
+	procedure pushQ()
+		returns (
+			contentsP : queue_t,
+			countP : integer,
+            fullP : boolean)
+
+        // Pre-conditions specify implications of full and !full.
+		requires (!full ==> (exists (i : integer) :: (i >= 0 && i < SIZE)
+                    && contents[i]._1 == 0));
+		requires (full ==> (forall (i : integer) :: (i >= 0 && i < SIZE)
+                    && contents[i]._1 > 0));
+        requires (_in._1 >= 0);
+        ensures (!full ==> countP == count + 1);
+        ensures (full ==> countP == count);
+	{
+        if (!full) {
+            for (i : integer) in range(0, SIZE) {
+                if (contents[i]._1 == 0) {
+                    contentsP = contents[i -> _in];
+                    countP = count + 1;
+                }
+            }
+        }
+        if (count == SIZE) {
+            fullP = true;
+        }
+	}
+
+	procedure popQ()
+		returns (
+            ret : data_t,
+            contentsP : [index_t]data_t,
+			countP : integer,
+            fullP : boolean)
+
+        requires (forall (i : integer) :: (i >= 0 && i < SIZE) && 
+                    contents[i]._1 >= 0);
+		ensures (countP == count - 1);
+        ensures (forall (i : integer) :: (i >= 0 && i < SIZE) &&
+                    contents[i]._1 <= ret._1);
+        modifies __max_idx__;
+	{
+        __max_idx__ = 0;
+        // FIXME: multiple inserts without break
+        for (i : integer) in range(0, SIZE) {
+            if (contents[i]._1 > contents[__max_idx__]._1) {
+                __max_idx__ = i;
+            }
+        }
+        ret = contents[__max_idx__];
+        contentsP = contents[__max_idx__ -> {0, 0}];
+        countP = count - 1;
+        if (countP < SIZE) {
+            fullP = false;
+        }
+	}
+
+    control {
+        vPush   = verify(pushQ);
+        vPop    = verify(popQ);
+        check;
+        print_results;
+        vPush.print_cex;
+        vPop.print_cex;
+    }
+}

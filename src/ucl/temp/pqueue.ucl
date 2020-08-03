@@ -1,0 +1,120 @@
+module PQueue {
+    type op_t = enum { push, pop };
+    type index_t = integer;
+    type count_t = integer;
+    type data_t = { integer, integer }; // { priority, val }
+    type queue_t = [index_t]data_t;
+
+    const SIZE : integer = 4;
+
+    var contents : queue_t;
+    var head, tail : index_t;
+    var count : count_t;
+    var inited : boolean;
+
+	var max_idx : integer; // To store max queue index in popQ()
+    var max_item : data_t;
+
+    input op : op_t;
+    input data : data_t;
+
+    output first : data_t;
+    output valid : boolean;
+    output full : boolean;
+    output empty : boolean;
+    output found : boolean;
+
+    // queue order -> array index
+    define item_index (i : index_t) : index_t =
+        if ((i + head) >= SIZE)
+            then (i + head) - SIZE
+            else (i + head);
+
+    // array index -> queue order
+    define queue_index (i : index_t) : index_t =
+        if (head > i)
+            then i - head
+            else i + (SIZE - head);
+    
+    define in_queue (v : integer) : boolean =
+        (exists (i : index_t) ::
+            (i >= 0 && i < count) && contents[item_index(i)]._2 == v);
+
+	init {
+		head   = 0;
+		tail   = 0;
+		count  = 0;
+		valid  = false;
+		full   = false;
+		empty  = true;
+		inited = false;
+		found  = false;
+		max_idx    = 0;
+	}
+
+	procedure pushQ()
+		returns (
+			contentsP : queue_t,
+			tailP : index_t,
+			countP : integer)
+
+		requires !full;
+        requires (data._1 >= 0);
+		requires (tail >= 0 && tail < SIZE);
+		ensures (contentsP == contents[tail -> data]);
+		ensures (tailP == if (tail == SIZE-1) then 0 else (tail + 1));
+		ensures (countP == if (count == SIZE) then 0 else (count + 1));
+	{
+		contentsP = contents[tail -> data];
+		tailP = tail + 1;
+		if (tailP >= SIZE) { tailP = 0; }
+
+		if (count == SIZE) { countP = 0; } // overflow
+		else { countP = count + 1; }
+	}
+
+	procedure popQ()
+		returns (
+            item : data_t,
+            contentsP : [index_t]data_t,
+			tailP : integer,
+			countP : integer)
+
+		requires !empty;
+		requires (head >= 0 && head < SIZE);
+		requires (tail >= 0 && tail < SIZE);
+        requires (forall (i : integer) :: contents[i]._1 >= 0);
+		ensures (tailP == if (tail == 0) then (SIZE - 1) else (tail - 1));
+		ensures (countP == count - 1);
+        ensures (forall (i : integer) :: contents[i]._1 <= item._1);
+        modifies max_idx, max_item;
+	{
+		max_idx = 0; // Array index, not the queue order
+		for (i : integer) in range(0, SIZE) {
+			if (contents[i]._1 > contents[max_idx]._1) {
+                max_idx = queue_index(i);
+			}
+		}
+        max_item = contents[item_index(max_idx)];
+        item = max_item;
+
+        // remove hole in array
+        for (j : integer) in range(0, SIZE) {
+            if (j >= max_idx) {
+                contentsP = contents[item_index(j) -> contents[item_index(j+1)]];
+            }
+        }
+        if (tail == 0) { tailP = SIZE - 1; }
+        else { tailP = tail - 1; }
+        countP = count - 1;
+	}
+	
+    control {
+        // vPush   = verify(pushQ);
+        vPop    = verify(popQ);
+        check;
+        print_results;
+        // vPush.print_cex;
+        vPop.print_cex;
+    }
+}

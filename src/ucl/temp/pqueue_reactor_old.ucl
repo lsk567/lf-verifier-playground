@@ -1,0 +1,279 @@
+/**
+ * A priority queue implementation for reactors.
+ *
+ * In this implementation, events with the lowest tag
+ * are popped together in the _out array. The input
+ * data should both provide the input array and the
+ * length. The values will not be inserted if the input
+ * exceeds the capacity of the priority queue.
+ *
+ * TODO:
+ * 1. change priority logic
+ * 2. null event
+ */
+
+/**
+ * A helper module for common types and constants
+ */
+module Common {
+    // FILE_SPECIFIC
+    type reactor_id_t = enum { A, B, NULL };
+    type trigger_id_t = enum { A_OUT, B_IN, N_NULL };
+    type token_t      = integer; // To support "anytype"
+
+    // COMMON
+    type instant_t    = integer;
+    type is_present_t = boolean;
+
+    /**
+     * Use tuple instead of record for easy instantiation,
+     * the event_t tuple is defined as [from_reactor_id,
+     * to_reactor_id, time_of_release, trigger_id, token]
+     *
+     * Note: if type overload is enabled, the token_t field
+     * can be reduced to 1 field. Otherwise, multiple token_t
+     * fields are needed depending on the LF program.
+     */
+    type event_t = {
+                     instant_t,     // Tag
+                     reactor_id_t,  // From
+                     reactor_id_t,  // To
+                     trigger_id_t,  // Trigger
+                     token_t,       // Token
+                     is_present_t   // Is_present
+                   };
+
+    const null_event : event_t;
+    axiom (null_event._1 > 0);
+}
+
+module PQueue {
+    type * = Common.*;
+    const * = Common.*;
+
+    type op_t = enum { PUSH, POP };
+    type index_t = integer;
+    type count_t = integer;
+    // type data_t = { integer, integer }; // { priority, val }
+    type queue_t = [index_t]event_t;
+
+    const SIZE : integer = 4;
+
+    // Public vars
+    var contents : queue_t;
+    var count : count_t;
+    var remaining : count_t;
+    var full : boolean;
+
+    // Helper vars
+	var __min_t__ : integer; // To store max queue index in popQ()
+    var __head__ : integer; // To track the head of input during push() 
+    var __null__ : event_t;
+
+    input op : op_t;
+    input _in : [index_t]event_t;
+    input _in_num : integer;
+
+    output _out : [index_t]event_t;
+    output _out_num : integer;
+    // True suggests the input arr is not inserted
+    // due to the potential of overflow.
+    output can_overflow : boolean; 
+
+	init {
+        // assume(forall (i : integer) :: (i >= 0 && i < SIZE) ==>
+        //        contents[i] == null_event);
+        for i in range(0, 4) {
+            contents[i] = __null__;
+        }
+		count  = 0;
+		full   = false;
+        can_overflow = false;
+		__min_t__    = 0;
+        __head__ = 0;
+        __null__ = { -1, NULL, NULL, N_NULL, -1, false };
+	}
+
+    // FIXME: keep things simple, minimal
+    // Push by appending
+    // Pop = putting things in a separate list +
+    //          generate a new list w/o holes
+    // If assertions don't work, don't bother.
+    // Don't care about efficiency. Care about simplicity.
+    // Reduce loops.
+	procedure pushQ()
+		returns (
+			contentsP : queue_t,
+			countP : integer,
+            fullP : boolean,
+            can_overflowP: boolean)
+
+        requires (__null__ == { -1, NULL, NULL, N_NULL, -1, false });
+        requires !full;
+        requires (count >= 0);
+        requires (remaining >= 0);
+        requires (count + remaining == SIZE);
+        requires (count < SIZE);
+
+        requires (_in_num >= 0 && _in_num <= remaining);
+        // requires (!full ==> count < SIZE);
+        // requires (full ==> count == SIZE);
+        // ensures (!full ==> countP == count);
+        // Incoming array must be smaller than SIZE
+        // requires (_in_num >= 0 && _in_num <= SIZE);
+        // requires (forall (i : integer) :: (i >= _in_num)
+        //             ==> _in[i] == null_event);
+
+        // requires (forall (i : integer) :: (i >= 0 && i < _in_num)
+        //             ==> _in[i]._1 >= 0);
+
+        // requires (forall (i : integer) :: _in[i] == null_event || 
+        //             _in[i]._1 >= 0);
+        // The relationship between count and contents
+        requires (count <= SIZE);
+        requires (forall (i : integer) :: (i >= count)
+                    ==> contents[i] == __null__);
+        requires (forall (i : integer) :: (i >= 0 && i < count)
+                    ==> contents[i]._1 >= 0);
+        // Pre-conditions specify implications of full and !full.
+        /*
+		requires (!full ==> (exists (i : integer) :: (i >= 0 && i < SIZE)
+                    && contents[i] == null_event &&
+                    count < SIZE));
+		requires (full ==> (forall (i : integer) :: (i >= 0 && i < SIZE)
+                    && contents[i] != null_event &&
+                    count == SIZE));
+        */
+
+
+        ensures (forall (e : event_t) :: in_queue(e))
+        ensures (countP == count + _in_num);
+        // ensures (full ==> countP == count);
+        modifies count, remaining, __head__;
+	{
+        /*
+        if (!full) {
+            for (k : integer) in range(0, SIZE) {
+                __done__ = false;
+                for (i : integer) in range(0, SIZE) {
+                    if (contents[i]._1 == 0 && _in[k]._1 > 0
+                        && !__done__) {
+                        contentsP = contents[i -> _in[k]];
+                        countP = count + 1;
+                        __done__ = true;
+                    }
+                }
+            }
+        }
+        */
+
+        __head__ = 0;
+
+        // Ensure the input length is less than available spaces.
+        /*
+        if (_in_num > remaining) {
+            can_overflowP = true;
+        }
+        else {
+        */
+        for (i : integer) in range(0, SIZE) {
+            // Insert if there is an empty space
+            // and an unhandled input.
+            if (contents[i] == __null__ &&
+                    __head__ < _in_num) {
+                contentsP = contents[i -> _in[__head__]];
+                count = count + 1;
+                __head__ = __head__ + 1;
+            }
+        }
+
+        if (count == SIZE) {
+            fullP = true;
+        }
+
+        countP = count;
+        remaining = SIZE - countP;
+        // }
+	}
+
+    /*
+	procedure popQ()
+		returns (
+            ret : [index_t]event_t,
+            ret_num : integer,
+            contentsP : [index_t]event_t,
+			countP : integer,
+            fullP : boolean)
+
+        requires (forall (i : integer) :: (i >= 0 && i < SIZE) && 
+                    (contents[i]._1 >= 0 ||
+                    contents[i] == null_event));
+		ensures (countP == count - 1);
+        ensures (forall (i : integer, j : integer) :: 
+                    (i >= 0 && i < SIZE) &&
+                    (j >= 0 && j < SIZE) &&
+                    // ret[j] != null_event
+                    //     ==> contents[i]._1 > ret[j]._1);
+                    contents[i]._1 > ret[j]._1);
+        modifies remaining, __min_t__;
+	{
+        // Init helper variables
+        __min_t__ = 0;
+        ret_num = 0;
+        contentsP = contents;
+        countP = count;
+
+        // Find the max priority
+        for (i : integer) in range(0, SIZE) {
+            if (contents[i] != null_event &&
+                contents[i]._1 < __min_t__) {
+                __min_t__ = contents[i]._1;
+            }
+        }
+
+        // Return all matching values
+        for (i : integer) in range(0, SIZE) {
+            if (contents[i]._1 == __min_t__) {
+                // Set matching value to empty
+                contentsP = contentsP[i -> null_event];
+                countP = countP - 1;
+
+                // Add value to ret array
+                ret = ret[ret_num -> contents[i]];
+                ret_num = ret_num + 1;
+            }
+        }
+
+        if (countP < SIZE) {
+            fullP = false;
+        }
+
+        remaining = SIZE - countP;
+	}
+    */
+
+    next {
+        case
+            (op == PUSH) : {
+                call (contents', count', full', can_overflow')
+                    = pushQ();
+            }
+            /*
+            (op == POP) : {
+                call (_out', _out_num', contents', count', full') = popQ();
+            }
+            */
+        esac;
+    }
+
+    control {
+        // v       = unroll(5);
+        vPush   = verify(pushQ);
+        // vPop    = verify(popQ);
+        check;
+        print_results;
+        // v.print_cex;
+        vPush.print_cex;
+        // vPop.print_cex;
+    }
+}

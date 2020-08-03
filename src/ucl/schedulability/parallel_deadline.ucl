@@ -1,3 +1,8 @@
+/**
+ * Have concrete exec. time estimate and
+ * look for violating schedules.
+ */
+
 module A {
     output finish : integer;
 
@@ -46,8 +51,8 @@ module C {
     }
 
     next {
+        ddl_violation' = ddl_violated(start);
         finish' = start + exec_time;
-        ddl_violation' = ddl_violated(finish');
     }
 }
 
@@ -85,8 +90,8 @@ module E {
     }
 
     next {
+        ddl_violation' = ddl_violated(start);
         finish' = start + exec_time;
-        ddl_violation' = ddl_violated(finish');
     }
 }
 
@@ -156,39 +161,42 @@ module main {
     }
 
     next {
-        case 
-            (step == 0) : {
-                running' = schedule._1;
-            }
-            (step == 1) : {
-                running' = schedule._2;
-            }
-            (step == 2) : {
-                running' = schedule._3;
-            }
-            (step == 3) : {
-                running' = schedule._4;
-            }
-        esac
+        if (step <= 3) {
+            case 
+                (step == 0) : {
+                    running' = schedule._1;
+                }
+                (step == 1) : {
+                    running' = schedule._2;
+                }
+                (step == 2) : {
+                    running' = schedule._3;
+                }
+                (step == 3) : {
+                    running' = schedule._4;
+                }
+            esac
 
-        case
-            (running' == RB) : {
-                next(b);
-            }
-            (running' == RC) : {
-                next(c);
-            }
-            (running' == RD) : {
-                next(d);
-            }
-            (running' == RE) : {
-                next(e);
-            }
-        esac
+            case
+                (running' == RB) : {
+                    next(b);
+                }
+                (running' == RC) : {
+                    next(c);
+                }
+                (running' == RD) : {
+                    next(d);
+                }
+                (running' == RE) : {
+                    next(e);
+                }
+            esac
 
-        step' = step + 1;
+            step' = step + 1;
+        }
     }
 
+    // property no_c_ddl_violation : c.ddl_violation == false;
     property[LTL] no_c_ddl_violation : G(c.ddl_violation == false);
     // property[LTL] test : (current_physical_time == -10);
 

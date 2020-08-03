@@ -1,0 +1,179 @@
+/**
+ * A priority queue implementation that pushes and pops
+ * one element at a time.
+ *
+ * When verifying the main module that contains the "unroll"
+ * command, comment out the conditions in the PQueue module;
+ * otherwise strange outputs will appear.
+ */
+module PQueue
+{
+    type op_t = enum { PUSH, POP };
+    type index_t = integer;
+    type count_t = integer;
+    type data_t = integer;
+    type queue_t = [index_t]data_t;
+    
+    const END : integer = 4; // The size of pqueue is 5.
+    const NULL : integer = -1;
+
+    input op : op_t;
+    input data : data_t;
+
+    output out : data_t; // Output from popQ()
+
+    var contents : queue_t;
+    var count : integer; 
+
+    var __done__ : boolean;
+    var __min__ : integer;
+    var __min_idx__ : index_t;
+
+    define in_queue(q : [index_t]data_t, v : data_t) : boolean =
+        (exists (i : index_t) ::
+            (i >= 0 && i <= END) && q[i] == v);
+
+    procedure pushQ()
+        returns (
+            contentsP : queue_t,
+            countP : integer
+        )
+        modifies __done__;
+        // requires ( data == -1 ); // For printout purposes
+        requires ( op == PUSH ); // OP must be PUSH
+        requires ( count >= 0 && count < END + 1 ); // PQueue cannot be full. 
+        // The meaning of not being full.
+        requires (exists (i : integer) ::
+                    (i >= 0 && i < count) && contents[i] == NULL);
+        // Require the array does not contain the element
+        requires ( !in_queue(contents, data) );
+        // When these two post-conditions are disabled,
+        // the queue output behaves normally.
+        ensures ( countP == count + 1 );
+        ensures ( in_queue(contentsP, data) );
+    {
+        __done__ = false; // To prevent repetitive updates.
+        // contentsP = contents; // Can only assign to return once.
+        for (i : integer) in range(0, END) {
+            if (contents[i] == NULL && !__done__) {
+                contentsP = contents[i -> data];
+                countP = count + 1;
+                __done__ = true;
+            }
+        }
+        // Need to explicitly specify the values in the next state.
+        if (!__done__) {
+            contentsP = contents;
+            countP = count;
+        }
+    }
+
+    procedure popQ()
+        returns (
+            contentsP : [index_t]data_t,
+            countP : integer,
+            out : data_t
+        )
+        modifies __min__, __min_idx__;
+        requires (op == POP);
+        // Must not be empty
+        requires ( exists (i : integer) ::
+                    (i >= 0 && i <= END) &&
+                    contents[i] >= 0 );
+        ensures (countP == count - 1);
+        // TODO: make sure out is minimum
+    {
+        __min__ = contents[0];
+        __min_idx__ = 0; 
+
+        // Find the minimum
+        for (i : integer) in range(0, END) {
+            if (contents[i] != NULL) {
+                if (__min__ == NULL) {
+                    __min__ = contents[i];
+                    __min_idx__ = i;
+                }
+                else {
+                    if (contents[i] < __min__) {
+                        __min__ = contents[i];
+                        __min_idx__ = i;
+                    }
+                }
+            }
+        }
+
+        out = __min__;
+        contentsP = contents[__min_idx__ -> NULL];
+        /**
+         * We don't need to address the __min__ == -1 case,
+         * since the pre-condition says the queue is not empty.
+         */
+        countP = count - 1;
+    }
+
+    init {
+        count = 0;
+        for (i : integer) in range(0, END) {
+            contents[i] = NULL;
+        }
+
+        __done__ = false;
+        __min__ = 0;
+    }
+
+    next {
+        case
+            (op == PUSH) : {
+                call (contents', count') = pushQ();
+            }
+            (op == POP) : {
+                call (contents', count', out') = popQ();
+            }
+        esac;
+    }
+
+    control {
+        vPush = verify(pushQ);
+        vPop = verify(popQ);
+        check;
+        print_results;
+        vPush.print_cex();
+        vPop.print_cex();
+    }
+}
+
+module main {
+    type * = PQueue.*;
+    
+    var _op : op_t;
+    var _data : data_t;
+
+    instance q : PQueue(op : (_op), data : (_data));
+
+    init {
+        _op = PUSH;
+        _data = 0;
+    }
+
+    next {
+        if (_op == POP) {
+            _op' = PUSH;
+            _data' = _data + 1;
+        }
+        else {
+            _op' = POP;
+        }
+
+        next(q);
+    }
+
+    control {
+        v = unroll(8);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
+
+
+
