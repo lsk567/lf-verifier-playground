@@ -110,11 +110,18 @@ module Reactor_SourceA {
         // File specific
         // Load __in__ onto respective input variables
         if (is_present(__in__)) {
+            // Loading inputs
             case 
                 (__in__._4 == SourceA_startup) : {
                     startup' = __in__;
                 }
             esac
+
+            // Reset finalize_ outputs at new logical time, which is
+            // denoted by a new finalized table
+            if (finalized == {false, false, false, false, false, false}) {
+                finalize_SourceA_startup' = false;
+            }
         }
         else {
             // Trigger reaction
@@ -130,9 +137,6 @@ module Reactor_SourceA {
                     __pop__' = popQ(outQ);
                     outQ' = __pop__'._1;
                     __out__' = __pop__'._2;
-
-                    // Clear all finalize_ flags here
-                    finalize_SourceA_startup' = false;
                 }
             esac
         }
@@ -248,6 +252,12 @@ module Reactor_SourceB {
                     startup' = __in__;
                 }
             esac
+
+            // Reset finalize_ outputs at new logical time, which is
+            // denoted by a new finalized table
+            if (finalized == {false, false, false, false, false, false}) {
+                finalize_SourceB_startup' = false;
+            }
         }
         else {
             // Trigger reaction
@@ -259,9 +269,6 @@ module Reactor_SourceB {
                     __pop__' = popQ(outQ);
                     outQ' = __pop__'._1;
                     __out__' = __pop__'._2;
-
-                    // Clear all finalize_ flags here
-                    finalize_SourceB_startup' = false;
                 }
             esac
         }
@@ -365,6 +372,12 @@ module Reactor_SourceC {
                     _in' = __in__;
                 }
             esac
+
+            // Reset finalize_ outputs at new logical time, which is
+            // denoted by a new finalized table
+            if (finalized == {false, false, false, false, false, false}) {
+                finalize_SourceC_in' = false;
+            }
         }
         else {
             // Trigger reaction
@@ -377,9 +390,6 @@ module Reactor_SourceC {
                     __pop__' = popQ(outQ);
                     outQ' = __pop__'._1;
                     __out__' = __pop__'._2;
-
-                    // Clear all finalize_ flags here
-                    finalize_SourceC_in' = false;
                 }
             esac
         }
@@ -483,6 +493,12 @@ module Reactor_SourceD {
                     _in' = __in__;
                 }
             esac
+
+            // Reset finalize_ outputs at new logical time, which is
+            // denoted by a new finalized table
+            if (finalized == {false, false, false, false, false, false}) {
+                finalize_SourceD_in' = false;
+            }
         }
         else {
             // Trigger reaction
@@ -495,9 +511,6 @@ module Reactor_SourceD {
                     __pop__' = popQ(outQ);
                     outQ' = __pop__'._1;
                     __out__' = __pop__'._2;
-
-                    // Clear all finalize_ flags here
-                    finalize_SourceD_in' = false;
                 }
             esac
         }
@@ -627,6 +640,13 @@ module Reactor_Sink {
                     inB' = __in__;
                 }
             esac
+
+            // Reset finalize_ outputs at new logical time, which is
+            // denoted by a new finalized table
+            if (finalized == {false, false, false, false, false, false}) {
+                finalize_Sink_inA' = false;
+                finalize_Sink_inB' = false;
+            }
         }
         else {
             // Trigger reaction
@@ -639,10 +659,6 @@ module Reactor_Sink {
                     __pop__' = popQ(outQ);
                     outQ' = __pop__'._1;
                     __out__' = __pop__'._2;
-
-                    // Clear all finalize_ flags here
-                    finalize_Sink_inA' = false;
-                    finalize_Sink_inB' = false;
                 }
             esac
         }

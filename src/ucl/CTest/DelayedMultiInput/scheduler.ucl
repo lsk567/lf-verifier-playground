@@ -74,6 +74,7 @@ module Scheduler {
     // Finalized REACTION table
     // var finalized : [trigger_id_t]boolean;
     var finalized : final_tb_t;
+    var f_counter : integer;
     input finalize_SourceA_startup : boolean;
     input finalize_SourceB_startup : boolean;
     input finalize_SourceC_in : boolean;
@@ -230,6 +231,7 @@ module Scheduler {
 
         // File specific: init finalization table
         finalized = { false, false, false, false, false, false };
+        f_counter = 5;
         final_to_SourceA = finalized;
         final_to_SourceB = finalized;
         final_to_SourceC = finalized;
@@ -371,7 +373,14 @@ module Scheduler {
             }
         esac
         */
-        call () = update_finalized_table();
+
+        if (f_counter == 0) {
+            call () = update_finalized_table();
+            f_counter' = 5;
+        }
+        else {
+            f_counter' = f_counter - 1;
+        }
 
         /*
         SourceA_can_proceed' = finalized'._1;
