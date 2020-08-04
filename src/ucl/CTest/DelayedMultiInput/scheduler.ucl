@@ -33,27 +33,6 @@ module Scheduler {
     output S_to_SourceD : event_t;
     output S_to_Sink : event_t;
 
-    /*
-    type finalized_t  = record {
-                                SourceA_startup : boolean,
-                                SourceB_startup : boolean,
-                                SourceC_in : boolean,
-                                SourceD_in : boolean,
-                                Sink_inA : boolean,
-                                Sink_inB : boolean
-                            };
-    */
-    /*
-    type final_tb_t = { 
-                        boolean, // SourceA_startup
-                        boolean, // SourceB_startup
-                        boolean, // SourceC_in
-                        boolean, // SourceD_in
-                        boolean, // Sink_inA
-                        boolean  // Sink_inB
-                      };
-    */
-
     define get(q : final_tb_t, i : integer) : boolean
     = if (i == 1) then q._1 else
         (if (i == 2) then q._2 else
@@ -86,20 +65,6 @@ module Scheduler {
     output final_to_SourceC : final_tb_t;
     output final_to_SourceD : final_tb_t;
     output final_to_Sink    : final_tb_t;
-    /*
-    output final_to_SourceA : [trigger_id_t]boolean;
-    output final_to_SourceB : [trigger_id_t]boolean;
-    output final_to_SourceC : [trigger_id_t]boolean;
-    output final_to_SourceD : [trigger_id_t]boolean;
-    output final_to_Sink : [trigger_id_t]boolean;
-    */
-    /*
-    output SourceA_can_proceed : boolean;
-    output SourceB_can_proceed : boolean;
-    output SourceC_can_proceed : boolean;
-    output SourceD_can_proceed : boolean;
-    output Sink_can_proceed : boolean;
-    */
 
     /**
      * Notes:
@@ -237,29 +202,6 @@ module Scheduler {
         final_to_SourceC = finalized;
         final_to_SourceD = finalized;
         final_to_Sink = finalized;
-        /*
-        finalized[SourceA_startup] = false;
-        finalized[SourceB_startup] = false;
-        finalized[SourceC_in] = false;
-        finalized[SourceD_in] = false;
-        finalized[Sink_inA] = false;
-        finalized[Sink_inB] = false;
-        */
-        /*
-        finalized.SourceA_startup = false;
-        finalized.SourceB_startup = false;
-        finalized.SourceC_in = false;
-        finalized.SourceD_in = false;
-        finalized.Sink_inA = false;
-        finalized.Sink_inB = false;
-        */
-        /*
-        SourceA_can_proceed = false;
-        SourceB_can_proceed = false;
-        SourceC_can_proceed = false;
-        SourceD_can_proceed = false;
-        Sink_can_proceed = false;
-        */
     }
 
     /**
@@ -344,36 +286,7 @@ module Scheduler {
                                 Sink
                                );
 
-        // File specific: mark current trigger as known based on dependency
-        /*
-        case
-            (get_event_present(rq_out', eq_out')._4 == SourceA_startup) : {
-                finalized' = set(finalized, 1, true);
-            }
-            (get_event_present(rq_out', eq_out')._4 == SourceB_startup) : {
-                finalized' = set(finalized, 2, true);
-            }
-            (finalized._2 == true // Dependency) : {
-                finalized' = set(finalized, 3, true);
-            }
-            (get_event_present(rq_out', eq_out')._4 == SourceD_in
-            && finalized._3 == true
-            ) : {
-                finalized' = set(finalized, 4, true);
-            }
-            (get_event_present(rq_out', eq_out')._4 == Sink_inA
-            && finalized._1 == true
-            ) : {
-                finalized' = set(finalized, 5, true);
-            }
-            (get_event_present(rq_out', eq_out')._4 == Sink_inB
-            && finalized._4 == true
-            ) : {
-                finalized' = set(finalized, 6, true);
-            }
-        esac
-        */
-
+        // Update finalized table based on a counter.
         if (f_counter == 0) {
             call () = update_finalized_table();
             f_counter' = 5;
@@ -382,13 +295,6 @@ module Scheduler {
             f_counter' = f_counter - 1;
         }
 
-        /*
-        SourceA_can_proceed' = finalized'._1;
-        SourceB_can_proceed' = get(finalized'._2);
-        SourceC_can_proceed' = ;
-        SourceD_can_proceed' = false;
-        Sink_can_proceed' = false;
-        */
         final_to_SourceA' = finalized';
         final_to_SourceB' = finalized';
         final_to_SourceC' = finalized';
