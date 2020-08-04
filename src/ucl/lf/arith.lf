@@ -1,0 +1,44 @@
+target C;
+// potentially change this to uclid5
+
+reactor X {
+    input dbl:int;
+    input incr:int;
+    state s:int(1);
+
+    reaction(dbl) {=
+        self->s *= 2;
+        printf("%d\n", self->s);
+    =}
+
+    reaction(incr) {=
+        self->s += incr;
+        printf("%d\n", self->s);
+    =}
+}
+
+reactor Relay {
+    input r:int;
+    output out:int;
+    reaction (r) -> out {=
+        set(out, r);
+    =}
+}
+
+reactor Y {
+    output dbl:int;
+    output incr:int;
+    reaction(startup) -> dbl, incr {=
+        set(incr, 1);
+        set(dbl, 1);
+    =}
+}
+
+main reactor Composite {
+    x = new X();
+    r = new Relay();
+    y = new Y();
+    y.dbl -> r.r;
+    r.out -> x.dbl after 1 msec;
+    y.incr -> x.incr;
+}

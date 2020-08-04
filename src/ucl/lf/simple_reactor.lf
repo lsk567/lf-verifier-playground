@@ -1,0 +1,43 @@
+/**
+ * Simple as in easy for UCLID5 to model.
+ * In the UCLID5 model (simple_reactor.ucl),
+ * the notion of timestamped events 
+ * does not exist, hence showing a 
+ * pseudo-timer behavior.
+ */  
+
+target C;
+
+reactor A {
+	output _out:int;
+	
+	// Since the UCLID5 model
+	// does not yet have a notion
+	// of time. A state transition
+	// behaves like a timer.
+	timer t(0, 1 sec);
+	
+	reaction(t) -> _out {=
+		set(_out, 1);
+	=}
+}
+
+reactor B {
+	input _in:int;
+	// output _out:int;
+	state s:int;
+	reaction(startup) {=
+		self->s = 0;	
+	=}
+	reaction(_in) {=
+		self->s = self->s + _in;
+		printf("%d\n", self->s);
+	=}
+}
+
+main reactor Composition {
+	a = new A();
+	b = new B();
+	
+	a._out -> b._in;
+} 

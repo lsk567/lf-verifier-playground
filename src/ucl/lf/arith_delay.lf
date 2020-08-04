@@ -1,0 +1,77 @@
+target C;
+
+// Let events carry current value to be computed through
+// 
+
+reactor Arith {
+    input dbl:int;
+    input incr:int;
+    output relay:int;
+
+    reaction(dbl) -> relay {=
+    	int v = dbl;
+        v *= 2;
+        set(relay, v);
+    =}
+
+    reaction(incr) -> relay {=
+    	int v = incr;
+        v += 1;
+        set(relay, v);
+    =}
+}
+
+reactor Relay {
+    input r:int;
+    input in2:int;
+    output out:int;
+    output out2:int;
+    
+    reaction(r) -> out {=
+        set(out, r);
+    =}
+    reaction(in2) -> out2 {=
+    	set(out2, in2);
+    =}
+}
+
+reactor Reset {
+	input in:int;
+    output dbl:int;
+    output incr:int;
+    output out:int;
+    reaction(startup) -> dbl, incr {=
+        set(incr, 1);
+        set(dbl, 1);
+    =}
+    reaction(in) -> out {=
+    	// reset 
+    	set(out, 0);
+    =}
+}
+
+reactor Out {
+	input in:int;
+	input in2:int;
+	reaction(in) {=
+		printf("Current value (in) is: %d\n", in);	
+	=}
+	reaction(in2) {=
+		printf("Current value (in2) is: %d\n", in2);	
+	=}
+}
+
+main reactor Composite {
+    arith = new Arith();
+    relay = new Relay();
+    reset = new Reset();
+    out = new Out();
+    
+    arith.relay -> relay.in2 after 2 msec;
+    reset.dbl -> relay.r;
+    reset.out -> out.in2 after 1 msec;
+    relay.out -> arith.dbl after 1 msec;
+    relay.out -> reset.in after 1 msec;
+    relay.out2 -> out.in after 1 msec;
+    reset.incr -> arith.incr;
+}

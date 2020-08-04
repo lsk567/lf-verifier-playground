@@ -1,0 +1,35 @@
+/**
+ * Encode the notion of logical time
+ * in the UCLID5 LF model.
+ */ 
+target C;
+
+reactor A {
+	output _out:int;
+	reaction(startup) -> _out {=
+		set(_out, 1);
+	=}
+}
+
+reactor B {
+	input _in:int;
+	output _out:int;
+	reaction(_in) -> _out {=
+		set(_out, _in);
+	=}
+}
+
+reactor C {
+	input _in:int;
+	reaction(_in) {=
+		printf("%d\n", _in);
+	=}
+}
+
+main reactor Composition {
+	a = new A();
+	b = new B();
+	c = new C();
+	a._out -> b._in;
+	b._out -> c._in after 1 sec;
+} 
