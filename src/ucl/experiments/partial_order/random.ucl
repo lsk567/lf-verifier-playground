@@ -1,0 +1,44 @@
+module random {
+    var r : integer;
+    var s : integer;
+
+    init {
+        s = 0;
+    }
+
+    next {
+        havoc r; // use havoc to generate a random state r'
+        // assume(r > -2);
+        assume(r == -2 || r == -5 || r == 1 || r == 3);
+
+        s' = s + r';
+    }
+
+    // UCLID seems to show a trace that does not satisfy the property.
+    // property[LTL] less_than_10 : F(s < 10); // Always true since the starting state is < 100
+    // With assume(r > 0), the solver is able to infer that positive numbers will
+    // eventually increment the state s to 100, regardless of how many steps checked.
+    // With assume(r > -2), the solver discovers that by adding 0 or -1, the state
+    // stops incrementing and violates the condition.
+    // property[LTL] greater_than_100 : F(s > 100);
+
+    /***********************************************
+     * Providing some choices
+     * assume(r == -2 || r == -5 || r == 1 || r == 3)
+     ************************************************/
+    // Ask the solver to provide a trace to get to -6 by negating the property
+    // The trace will be provided in the form of counterexamples.
+    // property[LTL] can_not_reach_neg_6 : !F(s == -6);
+
+    // Ask the solver to provide a trace that does not get to -6
+    // property[LTL] can_reach_neg_6 : F(s == -6);
+
+    // If all paths get to -6 (i.e. not able to find CEX), return pass.
+
+    control {
+        v = bmc(20);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
