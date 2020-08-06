@@ -1,0 +1,101 @@
+module main {
+    type * = Common.*;
+    type * = Finalized.*;
+
+    // Channels between the scheduler and reactors
+    var A_to_S : event_t;
+    var B_to_S : event_t;
+    var S_to_A : event_t;
+    var S_to_B : event_t;
+    
+    // Finalized
+    var finalize_A_startup      : boolean;
+    var finalize_B_in           : boolean;
+    var final_to_A              : final_tb_t;
+    var final_to_B              : final_tb_t;
+
+    var NULL_EVENT : event_t;
+
+    instance scheduler : Scheduler( A_to_S : (A_to_S),
+                                    B_to_S : (B_to_S),
+                                    S_to_A : (S_to_A),
+                                    S_to_B : (S_to_B),
+                                    finalize_A_startup : (finalize_A_startup),
+                                    finalize_B_in : (finalize_B_in),
+                                    final_to_A : (final_to_A),
+                                    final_to_B : (final_to_B));
+    instance a : Reactor_A(t : (scheduler.t),
+                                    __in__ : (S_to_A),
+                                    __out__ : (A_to_S),
+                                    finalized : (final_to_A),
+                                    finalize_A_startup : (finalize_A_startup));
+    instance b : Reactor_B(t : (scheduler.t),
+                                    __in__ : (S_to_B),
+                                    __out__ : (B_to_S),
+                                    finalized : (final_to_B),
+                                    finalize_B_in : (finalize_B_in));
+
+    // File specific
+    init {
+        NULL_EVENT = { -1, NULL, NULL, NULL_NULL, -1, false };
+        A_to_S = NULL_EVENT;
+        B_to_S = NULL_EVENT;
+        S_to_A = NULL_EVENT;
+        S_to_B = NULL_EVENT;
+
+        finalize_A_startup = false;
+        finalize_B_in = false;    
+
+        final_to_A       = { false, false };
+        final_to_B       = { false, false };
+    }
+
+    next {
+        next(scheduler);
+        next(a);
+        next(b);
+    }
+
+
+    /*****************
+     * Main Property *
+     *****************/
+    // Assuming the error state is b.s == 8 for some reason.
+    // The solver checks all possible assignments of a.s.
+    property[LTL] not_reachable_b_greater_than_10 : !F(b.s == 8);
+
+    control {
+        v = bmc(10);
+        check;
+        print_results;
+        v.print_cex(
+                    scheduler.t,
+                    scheduler.event_q.contents, 
+                    scheduler.event_q.op,
+                    scheduler.event_q.data,
+                    scheduler.event_q.count,
+                    scheduler.reaction_q.contents, 
+                    scheduler.reaction_q.op,
+                    scheduler.reaction_q.data,
+                    scheduler.reaction_q.count,
+                    scheduler.eq_op,
+                    scheduler.eq_data,
+                    scheduler.eq_out,
+                    scheduler.rq_op,
+                    scheduler.rq_data,
+                    scheduler.rq_out,
+                    scheduler.S_to_A,
+                    scheduler.S_to_B,
+                    scheduler.A_to_S,
+                    scheduler.B_to_S,
+                    scheduler.finalized,
+                    a.__in__,
+                    a.__out__,
+                    a.s,
+                    b.__in__,
+                    b.__out__,
+                    b.s
+        );
+    }
+}
+
