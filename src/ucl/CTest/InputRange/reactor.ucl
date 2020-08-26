@@ -196,6 +196,15 @@ module Reactor_B {
         modifies _in;
         modifies finalize_B_in;
     {
+        // Gametime
+        // basis traces, composition of traces
+        // exec. time depends on inputs.
+        // cross-time instance
+        //
+        // leverage induction to prove unbounded properties
+        // do bmc first, then try induction.
+        // try k-induction. BMC starting from arbitrary step
+        // transition k steps, and eventually perform the inductive step.
         /*****************
          * Reaction body *
          *****************/

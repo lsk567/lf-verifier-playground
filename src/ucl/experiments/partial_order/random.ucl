@@ -8,7 +8,7 @@ module random {
 
     next {
         havoc r; // use havoc to generate a random state r'
-        // assume(r > -2);
+        // should be r'
         assume(r == -2 || r == -5 || r == 1 || r == 3);
 
         s' = s + r';
@@ -37,7 +37,7 @@ module random {
 
 
     control {
-        v = bmc(20);
+        v = bmc(4);
         check;
         print_results;
         v.print_cex();

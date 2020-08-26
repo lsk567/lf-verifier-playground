@@ -62,7 +62,7 @@ module main {
      *****************/
     // Assuming the error state is b.s == 8 for some reason.
     // The solver checks all possible assignments of a.s.
-    property[LTL] not_reachable_b_greater_than_10 : !F(b.s == 8);
+    property[LTL] not_reachable_b_greater_than_10 : !F(b.s >= 10);
 
     control {
         v = bmc(10);
