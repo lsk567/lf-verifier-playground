@@ -1,5 +1,22 @@
 /**
- * Defines event queue and reaction queue.
+ * Defines a non-deterministic event queue and reaction queue.
+ *
+ * The queue can opportunistically pop any number of events
+ * with minimum time tags (EventQ) and minimum levels (ReactionQ).
+ * 
+ * The arbitrary delay can be modeled at either the pqueue side
+ * or the reactor side (by adding a non-deterministic start counter).
+ * In this case, it is explicitly modeled at the pqueue side,
+ * since it has the advantage of reducing schedule conflicts (e.g.
+ * sending reactors new events during its delay period).
+ * 
+ * However, the current formulation does not address the conflict
+ * when a reaction that takes multiple steps to execute receives a
+ * new event. This does not happen in simple systems, but might apear
+ * in complex ones.
+ *
+ * The design philosophy is to leave as much work to the infrastrucutre
+ * as possible and make reactors as simple as possible.
  */
 
 module EventQ
@@ -18,7 +35,9 @@ module EventQ
     var contents : queue_t;
     var count : integer;
 
-    procedure pushQ()
+    var step : integer; // Keep track of the current UCLID step
+
+    procedure push()
         modifies contents, count;
     {
         var index : integer;
@@ -48,44 +67,38 @@ module EventQ
         then the paths will be blocked by assume, because contents does not
         contain NULL_EVENT.
     */
-    procedure popQ()
+    procedure pop()
         modifies contents, count, out;
     {
-        /*
-        var out : queue_t;
-        var index : integer;
-        index = 1;
-        assume();
-        
-        for (i : integer) in range(1, SIZE) {
-            if (get(out, i) != NULL_EVENT) {
-                // Remove the event from the content array
-                content = set(contents, i, NULL_EVENT);
-            }
-        }
-        count = count - countQ(out); 
-        */
-
-
         havoc out;
-        // The queue contains elements that are the minimum of all 
-        // 1. Events in out must precede contents if not NULL_EVENT
-        // 2. If countEvent(e, contents) > 0 (has duplicate events),
-        //    countEvent(e, out) <= countEvent(e, contents)
         assume(forall (i : integer) :: 
             get(out, i) != NULL_EVENT ==>
             (
-                inQ(contents, get(out, i)) // Select element from contents array
-                && !(exists (e : event_t) :: inQ(contents, e) && e._1 < get(out, i)._1) // Elements have minimum time tag
-                && countE(out, get(out, i)) <= countE(contents, get(out, i)) // Out contains the same number of elem.
+                // Select element from contents array
+                inQ(contents, get(out, i)) 
+                // FIXME: this property might not enforce the popping of ALL minimum elems
+                // Elements have minimum time tag
+                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 < get(out, i)._1) 
+                // Pop all min elems, strengthening the previous clause
+                && (forall (e : event_t) :: (inQ(contents, e) && e._1 == get(out, i)._1) ==> inQ(out, e))
+                // Out contains the same number of elem.
+                && countE(out, get(out, i)) == countE(contents, get(out, i)) 
+                // The minimum value preserve the same index.
+                && get(contents, i) == get(out, i) 
             )
         );
+        assume(countQ(contents) > 0 ==> countQ(out) > 0); // Pop if possible.
 
-
-        count = 5;
+        for (i : integer) in range(1, SIZE) {
+            if (get(out, i) != NULL_EVENT) {
+                contents = set(contents, i, NULL_EVENT);
+            }
+        }
+        count = count - countQ(out);
     }
 
     init {
+        step = 0;
         NULL_EVENT = {
             // {-1, -1},
             -1,
@@ -97,6 +110,7 @@ module EventQ
             false
         };
 
+        assume(op == POP);
         count = 5;
         /*
         contents = {
@@ -109,20 +123,12 @@ module EventQ
         */
         contents = {
             {1, A, B, B_IN, INT, 10, false},
+            // NULL_EVENT,
             {5, A, C, C_IN, BOOL, 2, true},
-            {2, A, C, C_IN, BOOL, 2, true},
+            {1, A, C, C_IN, BOOL, 2, true},
             {4, A, C, C_IN, BOOL, 2, true},
             {3, A, C, C_IN, INT, 2, true}
         };
-
-        out = {
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT
-        };
-
         /*
         contents = {
             NULL_EVENT,
@@ -133,7 +139,14 @@ module EventQ
         };
         */
 
-        assume(op == POP);
+        out = {
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT
+        };
+
 
         /*
         assume(data == {
@@ -156,26 +169,29 @@ module EventQ
             NULL_EVENT
         });
         */
-
+        step' = step + 1;
         case
             (op == PUSH) : {
-                call () = pushQ();
+                call () = push();
             }
             (op == POP) : {
-                call () = popQ();
+                call () = pop();
             }
         esac
 
         assume(op == POP);
     }
 
-    property[LTL] test : !F(out == {
+    /*
+    property[LTL] test : !F(contents == {
             NULL_EVENT,
             NULL_EVENT,
             NULL_EVENT,
             NULL_EVENT,
             NULL_EVENT
         });
+    */
+    property[LTL] test : !F(count == 3 && step == 1);
 
     control {
         v = bmc(5);

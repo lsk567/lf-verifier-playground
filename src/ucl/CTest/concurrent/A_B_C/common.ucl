@@ -2,7 +2,6 @@
  * Defines common types and functions used throughout the model.
  */
 module Common {
-
     // FILE_SPECIFIC
     type reactor_id_t   = enum { A, B, C, NULL };
     type reaction_id_t  = enum { A_0, B_0, B_1, C_0, C_1, NULL_0 };
@@ -22,25 +21,11 @@ module Common {
                             boolean
                           };
 
-    var NULL_EVENT : event_t;
-
-    init {
-        NULL_EVENT = {
-                        // {-1, -1},
-                        -1,
-                        NULL,
-                        NULL,
-                        NULL_NULL,
-                        UNKNOWN,
-                        -1,
-                        false
-                    };
-    }
-
+    define isPresent(e : event_t) : boolean
+    = (e != { -1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false });
 }
 
-module Queue
-{
+module Queue {
     type * = Common.*;
 
     type op_t = enum { PUSH, POP };
@@ -54,6 +39,12 @@ module Queue
                     data_t,
                     data_t
                    };
+    // A simple queue with head and tail
+    type q_t = { queue_t,
+                 integer,  // HEAD
+                 integer };  // TAIL
+
+    const SIZE : integer = 5;
 
     define get(q : queue_t, i : integer) : data_t
     = if (i == 1) then q._1 else
@@ -108,5 +99,16 @@ module Queue
     = equalE(q._1, e) + equalE(q._2, e) + equalE(q._3, e) +
                 equalE(q._4, e) + equalE(q._5, e);
 
-    const SIZE : integer = 5;
+    define pushQ(q : q_t, v : data_t) : q_t
+    = { set(q._1, q._3, v),
+        q._2,
+        (if (q._3 + 1 > SIZE) then 0 else (q._3 + 1)) };
+
+    define popQ(q : q_t) : {q_t, data_t}
+    = if (get(q._1, q._2) != {-1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false})
+      then  {{ set(q._1, q._2, {-1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false}),
+                (if (q._2 + 1 > SIZE) then 0 else (q._2 + 1)),
+                q._3 }, 
+                get(q._1, q._2)}
+      else {q, {-1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false}};
 }

@@ -1,0 +1,3 @@
+/**
+ * Schedules events and direct events to appropriate reactors
+ */
