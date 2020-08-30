@@ -1,0 +1,246 @@
+/**
+ * Coordinates event passing between reactors and priority queues
+ * and adjust the local clock.
+ */
+module Scheduler {
+    type * = EventQ.*;
+    const * = EventQ.*;
+
+    // File specific: comm. channels between scheduler and reactors
+    input GeneratedDelay_to_S : event_t;
+    input Source_to_S : event_t;
+    input Sink_to_S : event_t;
+
+    output S_to_GeneratedDelay : event_t;
+    output S_to_Source : event_t;
+    output S_to_Sink : event_t;
+
+    /**
+     * Notes:
+     * These two queues can potentially be merged
+     * and produce an _out_reaction array.
+     * Similarly, A and B are merged into one module
+     * containing all reactions and state variables.
+     * This allows all declarations to be in one local scope.
+     * But need to check whether this is actually useful,
+     * since we can do the same things in main module.
+     *
+     * The same _out_reaction can be fed to both A and B,
+     * where they selectively react to triggers with
+     * them as the destinations.
+     */
+
+    // The "null" event
+    var NULL_EVENT : event_t;
+
+    // Event queue variables 
+    // Both queues share these two fields for now.
+    // If need be, separate them and create a NoOp operation for queues.
+    var eq_op : op_t;
+    var eq_data : data_t;
+    var eq_out : data_t;
+
+    // Reaction queue variables
+    var rq_op : op_t;
+    var rq_data : data_t;
+    var rq_out : data_t;
+
+    // Event queue and reaction queue
+    instance event_q : EventQ(op : (eq_op), data : (eq_data), out : (eq_out));
+    instance reaction_q : ReactionQ(op : (rq_op), data : (rq_data), out : (rq_out));
+
+    // The current clock value
+    var t : instant_t;
+
+    // TODO: move this to the common module
+    define is_present(e : event_t) : boolean
+    = (e != NULL_EVENT);
+
+    // File specific: helper predicates
+    define has_available_event() : boolean
+    = (is_present(GeneratedDelay_to_S)
+        || is_present(Source_to_S)
+        || is_present(Sink_to_S));
+
+    // TODO: change the logic when using the updated event_t
+    // w/ an explicit reaction/action indicator.
+    define is_reaction(e : event_t) : boolean
+    = if (e._1 == t) then true else false; 
+
+    define get_event_present(e1 : event_t, e2 : event_t) : event_t
+    = if (is_present(e1)) then e1 else e2;
+
+    define get_event_dest(e : event_t, dest : reactor_id_t) : event_t
+    = if (e._3 == dest) then e else NULL_EVENT;
+
+    /**
+     * Load a non-empty input to push.
+     */
+    procedure push_event(e : event_t)
+        returns (
+            /*
+            _op : op_t,
+            _data : data_t
+            */
+            eq_op : op_t,
+            eq_data : data_t,
+            rq_op : op_t,
+            rq_data : data_t
+        )
+    {
+        if (is_reaction(e)) {
+            rq_op = PUSH;
+            rq_data = e;
+
+            // NoOp
+            eq_op = PUSH;
+            eq_data = NULL_EVENT;
+        }
+        else {
+            eq_op = PUSH;
+            eq_data = e;
+
+            // NoOp
+            rq_op = PUSH;
+            rq_data = NULL_EVENT;
+        }
+
+        /*
+        _op = PUSH;
+        _data = e;
+        */
+
+        // File specific
+        /*
+        case
+            (GeneratedDelay_to_S != NULL_EVENT) : {
+                _data = GeneratedDelay_to_S;
+            }
+            (Source_to_S != NULL_EVENT) : {
+                _data = Source_to_S;
+            }
+            (Sink_to_S != NULL_EVENT) : {
+                _data = Sink_to_S;
+            }
+        esac
+        */
+    }
+
+    init {
+        NULL_EVENT = { -1, NULL, NULL, N_NULL, -1, false };
+        t = 0;
+
+        eq_op = PUSH;
+        eq_data = NULL_EVENT;
+
+        rq_op = PUSH;
+        rq_data = NULL_EVENT;
+
+        eq_out = NULL_EVENT;
+        rq_out = NULL_EVENT;
+
+        // File specific: init outputs
+        S_to_GeneratedDelay = NULL_EVENT;
+        S_to_Source = NULL_EVENT;
+        S_to_Sink = NULL_EVENT;
+    }
+
+    /**
+     * The next() function facilitates the transition of
+     * the system composed by reactors. It does two things specifically.
+     *
+     * 1. Check if there are input events. If so, push them into
+     *    appropriate queues (might take multiple steps).
+     * 2. If there are no more input events from reactors, pop from 
+     *    reaction queue first. When the reaction queue becomes empty, 
+     *    pop from event queue and advance time.
+     */
+
+
+    next {
+        // Push an incoming event
+        if (has_available_event()) {
+            /*
+            // TODO: Here we spend an extra UCLID step to process input data
+            // See if this step can be removed.
+            if (in_A._1 == t || in_B._1 == t) {
+                // Push to reaction queue if the event happens at the same instant.
+                call (rq_op', rq_data') = push_event();
+
+                // Event queue does nothing.
+                eq_op' = PUSH;
+                eq_data' = NULL_EVENT;
+            }
+            else {
+                // Push to event queue if it is a future action.
+                call (eq_op', eq_data') = push_event();
+
+                // Reaction queue does nothing.
+                rq_op' = PUSH;
+                rq_data' = NULL_EVENT;
+            }
+            */
+            
+            // File specific: select an available event to push
+            case
+                (is_present(GeneratedDelay_to_S)) : {
+                    call (eq_op', eq_data', rq_op', rq_data')
+                        = push_event(GeneratedDelay_to_S);
+                }
+                (is_present(Source_to_S)) : {
+                    call (eq_op', eq_data', rq_op', rq_data')
+                        = push_event(Source_to_S);
+                }
+                (is_present(Sink_to_S)) : {
+                    call (eq_op', eq_data', rq_op', rq_data')
+                        = push_event(Sink_to_S);
+                }
+            esac
+        }
+        // Pop an event from the queues
+        else {
+            // At this point there are no more events 
+            // from both reactors, pop from queue
+
+            // Pop from reaction queue if it is not empty.
+            if (reaction_q.count > 0) {
+                rq_op' = POP;
+                rq_data' = NULL_EVENT;
+
+                eq_op' = PUSH; // Pushing a NULL_EVENT is similar to NoOp.
+                eq_data' = NULL_EVENT;
+            }
+            else {
+                rq_op' = PUSH;
+                rq_data' = NULL_EVENT;
+
+                eq_op' = POP;
+                eq_data' = NULL_EVENT;
+            }
+        }
+
+        // Distribute events to appropriate reactors
+        S_to_GeneratedDelay' = get_event_dest(
+                                get_event_present(rq_out', eq_out'),
+                                GeneratedDelay
+                               );
+        S_to_Source' = get_event_dest(
+                                get_event_present(rq_out', eq_out'),
+                                Source
+                               );
+        S_to_Sink' = get_event_dest(
+                                get_event_present(rq_out', eq_out'),
+                                Sink
+                               );
+
+        // Update clock
+        if (is_present(eq_out')) {
+            t' = eq_out'._1;
+        }
+
+        // Transition queues
+        next(event_q);
+        next(reaction_q);
+    }
+
+}

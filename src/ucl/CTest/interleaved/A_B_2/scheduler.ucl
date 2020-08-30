@@ -1,0 +1,233 @@
+/**
+ *
+ */
+module RTI {
+    type * = EventQ.*;
+    const * = EventQ.*;
+
+    // TODO: rename these variable to "X_to_Y".
+    // Auto-generated
+    input in_A : event_t;  
+    input in_B : event_t;
+
+    output out_A : event_t;
+    output out_B : event_t;
+    /**
+     * Notes:
+     * These two queues can potentially be merged
+     * and produce an _out_reaction array.
+     * Similarly, A and B are merged into one module
+     * containing all reactions and state variables.
+     * This allows all declarations to be in one local scope.
+     * But need to check whether this is actually useful,
+     * since we can do the same things in main module.
+     *
+     * The same _out_reaction can be fed to both A and B,
+     * where they selectively react to triggers with
+     * them as the destinations.
+     */
+
+    // Shared
+    var NULL_EVENT : event_t;
+
+    // Event queue variables 
+    // Both queues share these two fields for now.
+    // If need be, separate them and create a NoOp operation for queues.
+    var eq_op : op_t;
+    var eq_data : data_t;
+    var eq_out : data_t;
+
+    // Reaction queue variables
+    var rq_op : op_t;
+    var rq_data : data_t;
+    var rq_out : data_t;
+
+    // Event queue and reaction queue
+    instance event_q : EventQ(op : (eq_op), data : (eq_data), out : (eq_out));
+    instance reaction_q : ReactionQ(op : (rq_op), data : (rq_data), out : (rq_out));
+
+    // The current clock value
+    var t : instant_t;
+
+    /**
+     * Load an input to push into either eq or rq.
+     */
+    procedure push_event()
+        returns (
+            _op : op_t,
+            _data : data_t
+        )
+    {
+        // If the incoming event has the same tag as current time
+        // push the event into reaction queue, otherwise into event queue.
+
+        _op = PUSH;
+
+        if (in_A != NULL_EVENT) {
+            _data = in_A;
+        }
+        else {
+            if (in_B != NULL_EVENT) {
+                _data = in_B;
+            }
+        }
+    }
+
+    /**
+     * Selects a queue to pop from.
+     *
+     * TODO: remove this procedure and set
+     * op directly in next{}.
+     */
+    procedure pop_events()
+        returns (
+            _op : op_t
+        )
+    {
+        _op = POP;
+    }
+
+    init {
+        NULL_EVENT = { -1, NULL, NULL, N_NULL, -1, false };
+        t = 0;
+
+        eq_op = PUSH;
+        eq_data = NULL_EVENT;
+
+        rq_op = PUSH;
+        rq_data = NULL_EVENT;
+
+        eq_out = NULL_EVENT;
+        rq_out = NULL_EVENT;
+
+        out_A = NULL_EVENT;
+        out_B = NULL_EVENT;
+    }
+
+    /**
+     * The next() function facilitates the transition of
+     * the system composed by reactors.
+     *
+     * The next() function pops events from the queue,
+     * pushes events into the queue,
+     * and check to see if it can advance time.
+     */
+    next {
+        /**
+         * 1. Check if there are input events. If so, push them into
+         *    appropriate queues (might take multiple steps).
+         * 2. If there are no more input events from reactors, pop from 
+         *    reaction queue first. When the reaction queue becomes empty, 
+         *    pop from event queue and advance time.
+         */
+        if (in_A != NULL_EVENT || in_B != NULL_EVENT) {
+
+            // TODO: Here we spend an extra UCLID step to process input data
+            // See if this step can be removed.
+            if (in_A._1 == t || in_B._1 == t) {
+                // Push to reaction queue if the event happens at the same instant.
+                call (rq_op', rq_data') = push_event();
+
+                // Event queue does nothing.
+                eq_op' = PUSH;
+                eq_data' = NULL_EVENT;
+            }
+            else {
+                // Push to event queue if it is a future action.
+                call (eq_op', eq_data') = push_event();
+
+                // Reaction queue does nothing.
+                rq_op' = PUSH;
+                rq_data' = NULL_EVENT;
+            }
+        }
+        else {
+            // At this point there are no more events 
+            // from both reactors, pop from queue
+
+            // Pop from reaction queue if it is not empty.
+            if (reaction_q.count > 0) {
+                rq_op' = POP;
+                rq_data' = NULL_EVENT;
+
+                eq_op' = PUSH; // Pushing a NULL_EVENT is similar to NoOp.
+                eq_data' = NULL_EVENT;
+            }
+            else {
+                rq_op' = PUSH;
+                rq_data' = NULL_EVENT;
+
+                eq_op' = POP;
+                eq_data' = NULL_EVENT;
+            }
+        }
+
+
+        /**
+         * Distribute events to appropriate reactors
+         */
+        if (rq_out' != NULL_EVENT) {
+            if (rq_out'._3 == A) {
+                out_A' = rq_out';
+                out_B' = NULL_EVENT;
+            }
+            else {
+                if (rq_out'._3 == B) {
+                    out_B' = rq_out';
+                    out_A' = NULL_EVENT;
+                }
+                else {
+                    if (rq_out'._3 == NULL) {
+                        out_A' = NULL_EVENT;
+                        out_B' = NULL_EVENT;
+                    }
+                }
+            }
+
+            /**
+             * Update local clock
+             */
+            if (rq_out' == NULL_EVENT) {
+                t' = t;
+            }
+            else {
+                t' = rq_out'._1;
+            }
+        }
+        else {
+            if (eq_out' != NULL_EVENT) {
+                if (eq_out'._3 == A) {
+                    out_A' = eq_out';
+                    out_B' = NULL_EVENT;
+                }
+                else {
+                    if (eq_out'._3 == B) {
+                        out_B' = eq_out';
+                        out_A' = NULL_EVENT;
+                    }
+                }
+            }
+            else {
+                out_A' = NULL_EVENT;
+                out_B' = NULL_EVENT;
+            }
+
+            /**
+             * Update local clock
+             */
+            if (rq_out' == NULL_EVENT) {
+                t' = t;
+            }
+            else {
+                t' = rq_out'._1;
+            }
+        }
+
+        // When the reaction queue is added, need to decide on a specific
+        // queue to advance.
+        // Advance event queue
+        next(event_q);
+        next(reaction_q);
+    }
+
+}
