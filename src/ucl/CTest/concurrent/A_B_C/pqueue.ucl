@@ -17,6 +17,12 @@
  *
  * The design philosophy is to leave as much work to the infrastrucutre
  * as possible and make reactors as simple as possible.
+ *
+ * Roadmap:
+ * 1. Create a pqueue that combines EventQ and ReactionQ (i.e. pop events
+ *    with the earliest time tag and the smallest level).
+ * 2. Build event distribution directly into pqueue and do not use
+ *    instantiations to conserve steps.
  */
 
 module EventQ
