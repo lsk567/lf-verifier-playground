@@ -1,18 +1,106 @@
 /**
  * Defines reactors.
  */
-module Reactor_A {
+module Reactor {
     type * = Queue.*;
     define * = Queue.*;
     define * = Common.*;
+
+    /*******************
+     * Program counter *
+     *******************/
+    type pc_t = enum {
+        start,
+        block1,
+        block2,
+        end
+    };
 
     /*******************************
      * File specific: LF variables *
      *******************************/
     // LF inputs
-    var startup : event_t;
+    var _in : event_t;
 
-    // LF outputs
-    var outA : event_t;
-    var outB : event_t;
+    // LF state variables
+    var s : integer;
+    
+    /**********************
+     * Internal variables *
+     **********************/
+    var NULL_EVENT : event_t;
+    var pc : pc_t;
+    var delay : integer;
+
+    procedure rxn_0_start()
+        modifies s;
+        modifies pc;
+    {
+        s = s + 1;
+        pc = block1;
+    }
+
+    procedure rxn_0_block1()
+        modifies s;
+        modifies pc;
+    {
+        s = s + 2;
+        pc = block2;
+    }
+
+    procedure rxn_0_block2()
+        modifies s;
+        modifies pc;
+    {
+        s = s + 3;
+        pc = end;
+    }
+
+    init {
+        havoc delay;
+        assume(delay > 0);
+
+        pc = start;
+
+        s = 0;
+    }
+
+    next {
+        if (delay == 0) {
+            case
+                (pc == start) : {
+                    call () = rxn_0_start();
+                }
+                (pc == block1) : {
+                    call () = rxn_0_block1();
+                }
+                (pc == block2) : {
+                    call () = rxn_0_block2();
+                }
+            esac 
+        }
+        else {
+            delay' = delay - 1;
+        }
+    }
 }
+
+module main {
+    instance r1 : Reactor();
+    instance r2 : Reactor();
+
+    next {
+        next(r1);
+        next(r2);
+    }
+
+    property[LTL] test : !F(r1.s + r2.s == 7);
+
+    control {
+        v = bmc(7);
+        check;
+        print_results;
+        v.print_cex(r1.delay, r1.pc, r1.s, r2.delay, r2.pc, r2.s);
+    }
+}
+

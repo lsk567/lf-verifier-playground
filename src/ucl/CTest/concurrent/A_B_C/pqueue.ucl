@@ -129,7 +129,6 @@ module EventQ
         */
         contents = {
             {1, A, B, B_IN, INT, 10, false},
-            // NULL_EVENT,
             {5, A, C, C_IN, BOOL, 2, true},
             {1, A, C, C_IN, BOOL, 2, true},
             {4, A, C, C_IN, BOOL, 2, true},
