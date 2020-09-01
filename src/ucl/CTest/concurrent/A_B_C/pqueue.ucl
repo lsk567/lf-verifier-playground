@@ -25,7 +25,7 @@
  *    instantiations to conserve steps.
  */
 
-module EventQ
+module Scheduler
 {
     type * = Queue.*;
     define * = Queue.*;
@@ -42,6 +42,8 @@ module EventQ
     var count : integer;
 
     var step : integer; // Keep track of the current UCLID step
+
+    var level : [trigger_id_t]integer;
 
     procedure push()
         modifies contents, count;
@@ -80,20 +82,27 @@ module EventQ
         assume(forall (i : integer) :: 
             get(out, i) != NULL_EVENT ==>
             (
-                // Select element from contents array
+                // 1. Select element from contents array
                 inQ(contents, get(out, i)) 
-                // FIXME: this property might not enforce the popping of ALL minimum elems
-                // Elements have minimum time tag
-                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 < get(out, i)._1) 
-                // Pop all min elems, strengthening the previous clause
-                && (forall (e : event_t) :: (inQ(contents, e) && e._1 == get(out, i)._1) ==> inQ(out, e))
-                // Out contains the same number of elem.
+                // 2. Out contains the same number of elem.
                 && countE(out, get(out, i)) == countE(contents, get(out, i)) 
-                // The minimum value preserve the same index.
+                // 3. The minimum value preserve the same index.
                 && get(contents, i) == get(out, i) 
+                // 4. Elements have minimum time tag
+                // The below property does not enforce the popping of ALL minimum elems
+                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 < get(out, i)._1) 
+                // [Not needed with clause 6 in place] Pop all min elems, strengthening the previous clause
+                // && (forall (e : event_t) :: (inQ(contents, e) && e._1 == get(out, i)._1) ==> inQ(out, e))
+                // 5. Out of the events with the minimum time tag, select the ones with the front most level
+                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 == get(out, i)._1 &&
+                     level[e._4] < level[get(out, i)._4])
+                // 6. Strengthening the previous clause to pop ALL satisfying elements
+                && (forall (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 == get(out, i)._1 &&
+                     level[e._4] == level[get(out, i)._4] ==> inQ(out, e)) 
             )
         );
-        assume(countQ(contents) > 0 ==> countQ(out) > 0); // Pop if possible.
+        // 7. Pop non-null events if possible.
+        assume(countQ(contents) > 0 ==> countQ(out) > 0);
 
         for (i : integer) in range(1, SIZE) {
             if (get(out, i) != NULL_EVENT) {
@@ -129,9 +138,9 @@ module EventQ
         */
         contents = {
             {1, A, B, B_IN, INT, 10, false},
-            {5, A, C, C_IN, BOOL, 2, true},
-            {1, A, C, C_IN, BOOL, 2, true},
-            {4, A, C, C_IN, BOOL, 2, true},
+            {2, A, C, B_IN, BOOL, 2, true},
+            {2, A, C, B_STARTUP, BOOL, 2, true},
+            {2, A, C, C_STARTUP, BOOL, 2, true},
             {3, A, C, C_IN, INT, 2, true}
         };
         /*
@@ -162,6 +171,13 @@ module EventQ
             NULL_EVENT
         });
         */
+
+        // File specific
+        level[A_STARTUP] = 1;
+        level[B_STARTUP] = 2;
+        level[C_STARTUP] = 2;
+        level[B_IN]      = 3;
+        level[C_IN]      = 3;
     }
 
     next {
@@ -187,7 +203,7 @@ module EventQ
         assume(op == POP);
     }
 
-    /*
+    
     property[LTL] test : !F(contents == {
             NULL_EVENT,
             NULL_EVENT,
@@ -195,8 +211,8 @@ module EventQ
             NULL_EVENT,
             NULL_EVENT
         });
-    */
-    property[LTL] test : !F(count == 3 && step == 1);
+    
+    // property[LTL] test : !F(count == 3 && step == 1);
 
     control {
         v = bmc(5);
