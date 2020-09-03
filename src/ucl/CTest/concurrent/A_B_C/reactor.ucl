@@ -1,7 +1,209 @@
 /**
  * Defines reactors.
+ *
+ * For reactions with multiple observation points,
+ * the outQ can be sequentially updated during the
+ * execution of a chunk. However, porting the outQ
+ * to the out port can only happen in the last chunk
+ * of the reaction, in order to make sure all output
+ * events arrive at the scheduler simultaneously.
  */
-module Reactor {
+module Reactor_Source {
+    type * = Queue.*;
+    const * = Queue.*;
+    define * = Queue.*;
+    define * = Common.*;
+   
+    type pc_t = enum {
+        start,
+        end
+    };
+
+    // LF actions
+    var startup : event_t;
+
+    // LF outputs
+    var outA : event_t;
+    var outB : event_t;
+
+    /**********************
+     * Internal variables *
+     **********************/
+    var NULL_EVENT : event_t;
+    var EMPTY_QUEUE : queue_t;
+    var pc : pc_t;
+    var delay : integer;
+
+    // Time, scheduler input, scheduler output
+    input t : integer;
+    input _in : queue_t;
+    output out : queue_t;
+
+    // A list of outbound events. Since one event is passed at a time,
+    // We need a place to temporary store the events that are not sent yet.
+    var outQ : q_t;
+    /*
+    var _pop : {
+        q_t,        // Updated output buffer
+        data_t      // Popped item
+    };
+    */
+
+    define all_inputs_empty () : boolean
+    = !(isPresent(startup));
+
+    // Allocate triggers to variables
+    procedure allocTriggers()
+        modifies startup;
+    {
+        for (i : integer) in range(1, SIZE) {
+            case
+                (get(_in, i)._4 == A_STARTUP) : {
+                    startup = get(_in, i);
+                }
+            esac
+        }
+    }
+
+    /*************
+     * Reactions *
+     *************/
+    // Reacts to the startup action.
+    procedure rxn_0_start()
+        modifies startup; // State variable
+        // modifies outQ, out, _pop, pc; // Internal
+        modifies outQ, out, pc; // Internal
+    {
+        /*****************
+         * Reaction body *
+         *****************/
+        outQ = pushQ(outQ, 
+                {
+                    t,      // Current time + delay
+                    A,      // Origin
+                    B,      // Destination
+                    B_IN,   // Trigger for destination
+                    INT,    // Payload data type
+                    1,      // Int
+                    true    // Bool 
+                });
+
+        outQ = pushQ(outQ, 
+                {
+                    t,      // Current time + delay
+                    A,      // Origin
+                    C,      // Destination
+                    C_IN,   // Trigger for destination
+                    INT,    // Payload data type
+                    2,      // Int
+                    true    // Bool 
+                });
+        
+        /*******************************************
+         * Post-processing                         *
+         * Only execute at the end of the reaction.*
+         *******************************************/
+        // Pop a value from outQ
+        // Handled in the reaction procedure for now since
+        // we need a sequential update to outQ.
+        /*
+        _pop = popQ(outQ);
+        outQ = _pop._1;
+        out = _pop._2;
+        */
+
+        out = outQ._1;
+
+        // Clear inputs
+        outQ = { EMPTY_QUEUE, 1, 1 };
+        startup = NULL_EVENT;
+
+        // Update pc
+        pc = end;
+
+        // Update finalized table
+        // finalize_Source_startup = true;
+    }
+
+    init {
+        NULL_EVENT = {
+            -1,
+            NULL,
+            NULL,
+            NULL_NULL,
+            UNKNOWN,
+            -1,
+            false
+        };
+        EMPTY_QUEUE = {
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT
+        };
+
+        out = EMPTY_QUEUE;
+
+        // "Setting" the input.
+        assume(_in == EMPTY_QUEUE);
+
+        outQ = { { NULL_EVENT,
+                 NULL_EVENT,
+                 NULL_EVENT,
+                 NULL_EVENT,
+                 NULL_EVENT },
+                 1, 1};
+
+        // File specific: init input/output/state variable
+        startup = NULL_EVENT;
+
+        // File specific: init all finalize_ flags here
+        // finalize_Source_startup = false;
+    }
+
+    next {
+        // File specific: load __in__ onto respective input variables
+        // FIXME: account for the case when a reactor has reactions that
+        // are not yet executed but the triggers are available.
+        // Use the case switch statement to mimic the deterministic order
+        // of reactions. In this case, the reactor will take multiple steps
+        // to execute a series of reactions, synonymous with each reactor
+        // using one thread. The case of parallelism within a reactor itself
+        // (e.g. scatter-gather) is to be handled.
+        if (isNotEmpty(_in)) {
+            /*
+            case 
+                (_in._4 == A_STARTUP) : {
+                    startup' = _in;
+                }
+            esac
+
+            // Reset finalize_ outputs at new logical time, which is
+            // denoted by a new finalized table
+            if (finalized == {false, false, false}) {
+                finalize_Source_startup' = false;
+            }
+            */
+
+            // Allocate triggers to variables
+            call () = allocTriggers();
+        }
+        else {
+            // File specific: trigger reaction
+            case
+                (isPresent(startup)) : {
+                    call () = rxn_0_start();
+                }
+                (all_inputs_empty() && pc == end) : {
+                    out' = EMPTY_QUEUE;
+                }
+            esac
+        }
+    }
+}
+
+module Reactor_Sink {
     type * = Queue.*;
     define * = Queue.*;
     define * = Common.*;
@@ -85,6 +287,7 @@ module Reactor {
     }
 }
 
+/*
 module main {
     instance r1 : Reactor();
     instance r2 : Reactor();
@@ -103,4 +306,4 @@ module main {
         v.print_cex(r1.delay, r1.pc, r1.s, r2.delay, r2.pc, r2.s);
     }
 }
-
+*/

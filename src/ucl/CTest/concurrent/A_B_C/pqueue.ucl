@@ -30,32 +30,49 @@ module Scheduler
     type * = Queue.*;
     define * = Queue.*;
     const * = Queue.*;
-
-    var NULL_EVENT : data_t;
-
-    input op : op_t;
-    input data : queue_t;
+    define * = Common.*;
     
-    var out : queue_t;
+    // Clock
+    var t : integer;
 
-    var contents : queue_t;
+    // Comm. channels
+    input a_to_s : queue_t;
+    input b_to_s : queue_t;
+    input c_to_s : queue_t;
+    output s_to_a : queue_t;
+    output s_to_b : queue_t;
+    output s_to_c : queue_t;
+
+    // Priority queue
+    // input op : op_t;
+    // input data : queue_t;
+    var op : op_t;
+    var data : queue_t;
+    var _out : queue_t;
+    var pqueue : queue_t;
     var count : integer;
-
     var step : integer; // Keep track of the current UCLID step
-
     var level : [trigger_id_t]integer;
 
-    procedure push()
-        modifies contents, count;
+    var NULL_EVENT : data_t;
+    var EMPTY_QUEUE : queue_t;
+
+    define has_new_events() : boolean
+    = (isNotEmpty(a_to_s)
+        || isNotEmpty(b_to_s)
+        || isNotEmpty(c_to_s));
+
+    procedure push(d : queue_t)
+        modifies pqueue, count;
     {
         var index : integer;
         var elem : data_t;
         index = 1;
 
         for (i : integer) in range(1, SIZE) {
-            if (get(contents, i) == NULL_EVENT) {
-                elem = get(data, index);
-                contents = set(contents, i, elem);
+            if (get(pqueue, i) == NULL_EVENT) {
+                elem = get(d, index);
+                pqueue = set(pqueue, i, elem);
                 if (elem != NULL_EVENT) {
                     count = count + 1;
                     index = index + 1;
@@ -72,50 +89,114 @@ module Scheduler
         which will cause collision.
     2. "get(out, i) != NULL_EVENT ==>" must be in the clause somehow.
         The reason could be that "out" is set first. If it contains NULL_EVENT,
-        then the paths will be blocked by assume, because contents does not
+        then the paths will be blocked by assume, because pqueue does not
         contain NULL_EVENT.
     */
     procedure pop()
-        modifies contents, count, out;
+        returns (outP : queue_t)
+        modifies pqueue, count;
     {
+        var out : queue_t;
         havoc out;
         assume(forall (i : integer) :: 
             get(out, i) != NULL_EVENT ==>
             (
-                // 1. Select element from contents array
-                inQ(contents, get(out, i)) 
+                // 1. Select element from pqueue array
+                inQ(pqueue, get(out, i)) 
                 // 2. Out contains the same number of elem.
-                && countE(out, get(out, i)) == countE(contents, get(out, i)) 
+                && countE(out, get(out, i)) == countE(pqueue, get(out, i)) 
                 // 3. The minimum value preserve the same index.
-                && get(contents, i) == get(out, i) 
+                && get(pqueue, i) == get(out, i) 
                 // 4. Elements have minimum time tag
                 // The below property does not enforce the popping of ALL minimum elems
-                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 < get(out, i)._1) 
+                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(pqueue, e) && e._1 < get(out, i)._1) 
                 // [Not needed with clause 6 in place] Pop all min elems, strengthening the previous clause
-                // && (forall (e : event_t) :: (inQ(contents, e) && e._1 == get(out, i)._1) ==> inQ(out, e))
+                // && (forall (e : event_t) :: (inQ(pqueue, e) && e._1 == get(out, i)._1) ==> inQ(out, e))
                 // 5. Out of the events with the minimum time tag, select the ones with the front most level
-                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 == get(out, i)._1 &&
+                && !(exists (e : event_t) :: (e != NULL_EVENT) && inQ(pqueue, e) && e._1 == get(out, i)._1 &&
                      level[e._4] < level[get(out, i)._4])
                 // 6. Strengthening the previous clause to pop ALL satisfying elements
-                && (forall (e : event_t) :: (e != NULL_EVENT) && inQ(contents, e) && e._1 == get(out, i)._1 &&
+                && (forall (e : event_t) :: (e != NULL_EVENT) && inQ(pqueue, e) && e._1 == get(out, i)._1 &&
                      level[e._4] == level[get(out, i)._4] ==> inQ(out, e)) 
             )
         );
         // 7. Pop non-null events if possible.
-        assume(countQ(contents) > 0 ==> countQ(out) > 0);
+        assume(countQ(pqueue) > 0 ==> countQ(out) > 0);
 
         for (i : integer) in range(1, SIZE) {
             if (get(out, i) != NULL_EVENT) {
-                contents = set(contents, i, NULL_EVENT);
+                pqueue = set(pqueue, i, NULL_EVENT);
             }
         }
         count = count - countQ(out);
+        outP = out;
+    }
+
+    // IMPROVEMENT: replace with axioms
+    procedure merge(q1, q2, q3 : queue_t)
+        returns (q : queue_t)
+    {
+        var index : integer; // Tail of the merged queue
+        var _q : queue_t;
+        index = 1;
+        _q = EMPTY_QUEUE;
+
+        // q1
+        for (i : integer) in range(1, SIZE) {
+            if (isPresent(get(q1, i)) && index <= 5) {
+                _q = set(_q, index, get(q1, i));
+                index = index + 1;
+            }
+        }
+
+        // q2
+        for (i : integer) in range(1, SIZE) {
+            if (isPresent(get(q2, i)) && index <= 5) {
+                _q = set(_q, index, get(q2, i));
+                index = index + 1;
+            }
+        }
+
+        // q3
+        for (i : integer) in range(1, SIZE) {
+            if (isPresent(get(q3, i)) && index <= 5) {
+                _q = set(_q, index, get(q3, i));
+                index = index + 1;
+            }
+        }
+
+        q = _q;
+    }
+
+    procedure distribute(o : queue_t)
+        modifies s_to_a, s_to_b, s_to_c;
+    {
+        // Reset
+        s_to_a = EMPTY_QUEUE;
+        s_to_b = EMPTY_QUEUE;
+        s_to_c = EMPTY_QUEUE;
+
+        for (i : integer) in range(1, SIZE) {
+            // Not necessarily putting values at the front of the queue
+            // since the head is not stored.
+            case
+                (get(o, i)._3 == A) : {
+                    s_to_a = set(s_to_a, i, get(o, i));
+                }
+                (get(o, i)._3 == B) : {
+                    s_to_b = set(s_to_b, i, get(o, i));
+                }
+                (get(o, i)._3 == C) : {
+                    s_to_c = set(s_to_c, i, get(o, i));
+                }
+            esac
+        }
     }
 
     init {
         step = 0;
+        t = 0;
         NULL_EVENT = {
-            // {-1, -1},
             -1,
             NULL,
             NULL,
@@ -124,11 +205,16 @@ module Scheduler
             -1,
             false
         };
+        EMPTY_QUEUE = {
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT
+        };
 
-        assume(op == POP);
-        count = 5;
         /*
-        contents = {
+        pqueue = {
             {{1,2}, A, B, B_IN, INT, 10, false},
             {{5,3}, A, C, C_IN, BOOL, 2, true},
             {{2,3}, A, C, C_IN, BOOL, 2, true},
@@ -136,31 +222,18 @@ module Scheduler
             {{3,3}, A, C, C_IN, INT, 2, true}
         };
         */
-        contents = {
+        /*
+        pqueue = {
             {1, A, B, B_IN, INT, 10, false},
             {2, A, C, B_IN, BOOL, 2, true},
             {2, A, C, B_STARTUP, BOOL, 2, true},
             {2, A, C, C_STARTUP, BOOL, 2, true},
             {3, A, C, C_IN, INT, 2, true}
         };
-        /*
-        contents = {
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT
-        };
         */
 
-        out = {
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT,
-            NULL_EVENT
-        };
-
+        pqueue = EMPTY_QUEUE;
+        _out = EMPTY_QUEUE;
 
         /*
         assume(data == {
@@ -178,39 +251,103 @@ module Scheduler
         level[C_STARTUP] = 2;
         level[B_IN]      = 3;
         level[C_IN]      = 3;
+
+        // Scheduler related
+        // This is in fact unnecessary, since events will come in from the outside.
+        // Un-comment the block below can create random behaviors if next block
+        // contains assumptions.
+        // Do not unblock until production.
+        /*
+        assume(a_to_s == EMPTY_QUEUE);
+        assume(b_to_s == EMPTY_QUEUE);
+        assume(c_to_s == EMPTY_QUEUE);
+        s_to_a = EMPTY_QUEUE;
+        s_to_b = EMPTY_QUEUE;
+        s_to_c = EMPTY_QUEUE;
+        */
+
+        // Startup events
+        pqueue._1 = {0, A, A, A_STARTUP, INT, 1, true};
+
+        // Init counter
+        count = countQ(pqueue);
     }
 
     next {
+        step' = step + 1;
+
+        // Push test
         /*
         assume(data == {
-            {{1,2}, A, B, B_IN, INT, 10, false},
-            {{5,3}, A, C, C_IN, BOOL, 2, true},
+            {1, A, B, B_IN, INT, 10, false},
+            {5, A, C, C_IN, BOOL, 2, true},
             NULL_EVENT,
             NULL_EVENT,
             NULL_EVENT
         });
         */
-        step' = step + 1;
-        case
-            (op == PUSH) : {
-                call () = push();
-            }
-            (op == POP) : {
-                call () = pop();
-            }
-        esac
 
-        assume(op == POP);
-    }
-
-    
-    property[LTL] test : !F(contents == {
+        // Distribution test
+        /*
+        assume(step == 0 ==> a_to_s == {
+            {1, A, A, A_STARTUP, INT, 10, false},
+            {3, A, B, B_IN, BOOL, 2, true},
             NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT
+        });
+        assume(step == 0 ==> b_to_s == {
+            {3, B, C, C_IN, BOOL, 3, true},
             NULL_EVENT,
             NULL_EVENT,
             NULL_EVENT,
             NULL_EVENT
         });
+        assume(step == 0 ==> c_to_s == EMPTY_QUEUE);
+        assume(step > 0 ==> a_to_s == EMPTY_QUEUE);
+        assume(step > 0 ==> b_to_s == EMPTY_QUEUE);
+        assume(step > 0 ==> c_to_s == EMPTY_QUEUE);
+        */
+
+        // PQueue test
+        /*
+        case
+            (op == PUSH) : {
+                call () = push(data);
+
+                // _out' = EMPTY_QUEUE;
+            }
+            (op == POP) : {
+                call (_out') = pop();
+                
+                // data' = EMPTY_QUEUE;
+            }
+        esac
+
+        // assume(op == PUSH);
+        // assume(op == POP);
+        */
+
+        // If there are incoming events, push into the queue.
+        if (has_new_events()) {
+            // Merge events from reactors into one queue.
+            call (data') = merge(a_to_s, b_to_s, c_to_s);
+            call () = push(data');
+
+            // _out' = EMPTY_QUEUE;
+        }
+        else {
+            call (_out') = pop();
+
+            // data' = EMPTY_QUEUE;
+        }
+
+        // Distribute events to appropriate locations
+        call () = distribute(_out');
+    }
+
+    // property[LTL] test : !F(pqueue == EMPTY_QUEUE);
+    property[LTL] test : !F(step == 2);
     
     // property[LTL] test : !F(count == 3 && step == 1);
 
@@ -218,6 +355,8 @@ module Scheduler
         v = bmc(5);
         check;
         print_results;
-        v.print_cex(contents, count, op, data, out);
+        v.print_cex(step, pqueue, count, op, data, _out,
+                    a_to_s, b_to_s, c_to_s,
+                    s_to_a, s_to_b, s_to_c);
     }
 }
