@@ -1,0 +1,120 @@
+/**
+ * The driver module for the uclid model
+ */
+module main {
+    type * = Queue.*;
+    
+    // Comm. channels
+    var a_to_s : queue_t;
+    var b_to_s : queue_t;
+    var c_to_s : queue_t;
+    var s_to_a : queue_t;
+    var s_to_b : queue_t;
+    var s_to_c : queue_t;
+
+    // Helper vars
+    var sum : integer;
+    var b_s_value : integer;
+    var c_s_value : integer;
+
+    var NULL_EVENT : event_t;
+    var EMPTY_QUEUE : queue_t;
+
+    instance scheduler : Scheduler(
+        a_to_s : (a_to_s),
+        b_to_s : (b_to_s),
+        c_to_s : (c_to_s),
+        s_to_a : (s_to_a),
+        s_to_b : (s_to_b),
+        s_to_c : (s_to_c)
+    );
+
+    instance a : Reactor_Source(
+        t : (scheduler.t),
+        _in : (s_to_a),
+        out : (a_to_s)
+    );
+
+    instance b : Reactor_Sink(
+        t : (scheduler.t),
+        _in : (s_to_b),
+        out : (b_to_s)
+    );
+
+    instance c : Reactor_Sink(
+        t : (scheduler.t),
+        _in : (s_to_c),
+        out : (c_to_s)
+    );
+
+    init {
+        NULL_EVENT = {
+            -1,
+            NULL,
+            NULL,
+            NULL_NULL,
+            UNKNOWN,
+            -1,
+            false
+        };
+        EMPTY_QUEUE = {
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT,
+            NULL_EVENT
+        };
+    
+        a_to_s = EMPTY_QUEUE;
+        b_to_s = EMPTY_QUEUE;
+        c_to_s = EMPTY_QUEUE;
+        s_to_a = EMPTY_QUEUE;
+        s_to_b = EMPTY_QUEUE;
+        s_to_c = EMPTY_QUEUE;
+    }
+
+    next {
+        b_s_value' = b.s;
+        c_s_value' = c.s;
+        sum' = b_s_value' + c_s_value';
+
+        next(scheduler);
+        next(a);
+        next(b);
+        next(c);
+    }
+
+    property[LTL] seven_is_unsafe : !F(sum == 7);
+
+    control {
+        v = bmc(7);
+        check;
+        print_results;
+        v.print_cex(
+            scheduler.t,
+            scheduler.step, 
+            scheduler.pqueue, 
+            scheduler.count, 
+            scheduler.op, 
+            scheduler.data, 
+            scheduler._out,
+            scheduler.a_to_s, 
+            scheduler.b_to_s, 
+            scheduler.c_to_s,
+            scheduler.s_to_a,
+            scheduler.s_to_b, 
+            scheduler.s_to_c,
+            b.delay,
+            b.s,
+            c.delay,
+            c.s
+        );
+    }
+}
+
+
+
+
+
+
+

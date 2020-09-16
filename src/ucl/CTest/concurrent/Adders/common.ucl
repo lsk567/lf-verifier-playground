@@ -1,0 +1,125 @@
+/**
+ * Defines common types and functions used throughout the model.
+ */
+module Common {
+    // FILE_SPECIFIC
+    // FIXME: use lower case for instantiation.
+    type reactor_id_t   = enum { A, B, C, NULL };
+    type reaction_id_t  = enum { A_0, B_0, B_1, C_0, C_1, NULL_0 };
+    type trigger_id_t   = enum { A_STARTUP, B_STARTUP, B_IN, C_STARTUP, C_IN, NULL_NULL };
+
+    // COMMON
+    // type instant_t      = { integer, integer }; // Superdense time
+    type instant_t      = integer;
+    type datatype_t     = enum { INT, BOOL, UNKNOWN };
+    type event_t        = {
+                            instant_t,
+                            reactor_id_t,
+                            reactor_id_t,
+                            trigger_id_t,
+                            datatype_t,
+                            integer,
+                            boolean
+                          };
+
+    define isPresent(e : event_t) : boolean
+    = (e != { -1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false });
+
+}
+
+module Queue {
+    type * = Common.*;
+
+    type op_t = enum { PUSH, POP };
+    type index_t = integer;
+    type count_t = integer;
+    type data_t = event_t;
+    type queue_t = {
+                    data_t,
+                    data_t,
+                    data_t,
+                    data_t,
+                    data_t
+                   };
+    // A simple queue with head and tail
+    type q_t = { queue_t,
+                 integer,  // HEAD
+                 integer };  // TAIL
+
+    const SIZE : integer = 5;
+
+    define get(q : queue_t, i : integer) : data_t
+    = if (i == 1) then q._1 else
+        (if (i == 2) then q._2 else
+            (if (i == 3) then q._3 else
+                (if (i == 4) then q._4 else
+                    if (i == 5) then q._5 else
+                        // {{-1, -1},
+                        {-1,
+                        NULL,
+                        NULL,
+                        NULL_NULL,
+                        UNKNOWN,
+                        -1,
+                        false})));
+
+    define set(q : queue_t, i : integer, v : data_t) : queue_t
+    = if (i == 1) then {v, q._2, q._3, q._4, q._5} else
+        (if (i == 2) then {q._1, v, q._3, q._4, q._5} else
+            (if (i == 3) then {q._1, q._2, v, q._4, q._5} else
+                (if (i == 4) then {q._1, q._2, q._3, v, q._5} else (
+                    if (i == 5) then {q._1, q._2, q._3, q._4, v} else
+                        q))));
+
+    define inQ(q : queue_t, v : data_t) : boolean
+    = if (v == q._1) then true else
+        (if (v == q._2) then true else 
+            (if (v == q._3) then true else
+                (if (v == q._4) then true else 
+                    (if (v == q._5) then true else false))));
+
+    define isNULL(d : data_t) : integer
+    = if (d == 
+            // {{-1, -1},
+            {-1,
+            NULL,
+            NULL,
+            NULL_NULL,
+            UNKNOWN,
+            -1,
+            false}
+    ) then 1 else 0;
+
+    define isNotEmpty(q : queue_t) : boolean
+    = (q != {
+        { -1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false },
+        { -1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false },
+        { -1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false },
+        { -1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false },
+        { -1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false }
+    });
+
+    define equalE(e1 : event_t, e2 : event_t) : integer
+    = if (e1 == e2) then 1 else 0;
+
+    define countQ(q : queue_t) : integer
+    = SIZE - (isNULL(q._1) + isNULL(q._2) + isNULL(q._3) + 
+                isNULL(q._4) + isNULL(q._5));
+
+    define countE(q : queue_t, e : event_t) : integer
+    = equalE(q._1, e) + equalE(q._2, e) + equalE(q._3, e) +
+                equalE(q._4, e) + equalE(q._5, e);
+
+    define pushQ(q : q_t, v : data_t) : q_t
+    = { set(q._1, q._3, v),
+        q._2,
+        (if (q._3 + 1 > SIZE) then 0 else (q._3 + 1)) };
+
+    define popQ(q : q_t) : {q_t, data_t}
+    = if (get(q._1, q._2) != {-1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false})
+      then  {{ set(q._1, q._2, {-1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false}),
+                (if (q._2 + 1 > SIZE) then 0 else (q._2 + 1)),
+                q._3 }, 
+                get(q._1, q._2)}
+      else {q, {-1, NULL, NULL, NULL_NULL, UNKNOWN, -1, false}};
+}

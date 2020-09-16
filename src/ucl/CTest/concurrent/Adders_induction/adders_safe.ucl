@@ -1,0 +1,124 @@
+/**
+ * Verify concurrent executions of reactors via induction.
+ */
+module Reactor_Sink {
+    define * = Common.*;
+   
+    // Program counter
+    type pc_t = enum {
+        start,
+        block1,
+        block2,
+        end
+    };
+
+    // LF state variables
+    var s : integer;
+
+    // Internal variables
+    var pc : pc_t;
+    var delay : integer;
+
+    procedure rxn1_start()
+        modifies s;
+        modifies pc; // Internal
+    {
+        s = s + 2;
+
+        // Update pc
+        pc = block1;
+    }
+
+    procedure rxn1_block1()
+        modifies s;
+        modifies pc;
+    {
+        s = s + 4;
+
+        // Update pc
+        pc = block2;
+    }
+
+    procedure rxn1_block2()
+        modifies s;
+        modifies pc; // Internal
+    {
+        s = s + 6;
+
+        // Update pc
+        pc = end;
+    }
+
+    init {
+        pc = start;
+        delay = 0;
+        s = 0;
+    }
+
+    next {
+        if (delay == 0) {
+            case
+                (pc == start) : {
+                    call () = rxn1_start();
+                }
+                (pc == block1) : {
+                    call () = rxn1_block1();
+                }
+                (pc == block2) : {
+                    call () = rxn1_block2();
+                }
+            esac
+        }
+        else {
+            delay' = delay - 1;
+        }
+    }
+}
+
+module main {
+    type * = Reactor_Sink.*;
+
+    var n : integer;
+
+    instance b : Reactor_Sink();
+    instance c : Reactor_Sink();
+
+    init {
+        n = 0;
+    }
+
+    next {
+        next(b);
+        next(c);
+    }
+
+    // Main properties
+    invariant sum_is_always_even : !(exists (n : integer) :: b.s + c.s == 2 * n + 1)
+                        // helper invariants
+                        && (b.delay >= 0 && c.delay >= 0)                // Delay cannot be negative.
+                        && (b.delay > 0 ==> b.pc == start)               // When there is a delay, pc is at start.
+                        && (c.delay > 0 ==> c.pc == start)               // Same as above.
+                        && (n >= 0)                                      // The scaling factor is non-negative.
+                        && (b.pc == start ==> b.s == n * 12)             // Prior to executing start, the state is a multiple of 12.
+                        && (b.pc == block1 ==> b.s == n * 12 + 2)        // Prior to executing block1, the state is a multiple of 12 plus 1.
+                        && (b.pc == block2 ==> b.s == n * 12 + 2 + 4)    // Prior to executing block1, the state is a multiple of 6 plus 3.
+                        && (b.pc == end ==> b.s == (n + 1) * 12)         // Prior to executing block1, the state is a multiple of 6 with (n+1).
+                        && (c.pc == start ==> c.s == n * 12)             // Same as above.
+                        && (c.pc == block1 ==> c.s == n * 12 + 2)        // Same as above.
+                        && (c.pc == block2 ==> c.s == n * 12 + 2 + 4)    // Same as above.
+                        && (c.pc == end ==> c.s == (n + 1) * 12);        // Same as above.
+
+    control {
+        v = induction;
+        check;
+        print_results;
+        v.print_cex(
+            b.delay, b.s, b.pc,
+            c.delay, c.s, c.pc,
+            n
+        );
+    }
+}
+
+
+

@@ -1,0 +1,133 @@
+/**
+ * Verify concurrent executions of reactors via induction.
+ */
+module Reactor_Sink {
+    define * = Common.*;
+   
+    // Program counter
+    type pc_t = enum {
+        start,
+        block1,
+        block2,
+        end
+    };
+
+    // LF state variables
+    var s : integer;
+
+    // Internal variables
+    var pc : pc_t;
+    var delay : integer;
+
+    procedure rxn1_start()
+        modifies s;
+        modifies pc; // Internal
+    {
+        s = s + 1;
+
+        // Update pc
+        pc = block1;
+    }
+
+    procedure rxn1_block1()
+        modifies s;
+        modifies pc;
+    {
+        s = s + 2;
+
+        // Update pc
+        pc = block2;
+    }
+
+    procedure rxn1_block2()
+        modifies s;
+        modifies pc; // Internal
+    {
+        s = s + 3;
+
+        // Update pc
+        pc = end;
+    }
+
+    init {
+        pc = start;
+        delay = 0;
+        s = 0;
+    }
+
+    next {
+        if (delay == 0) {
+            case
+                (pc == start) : {
+                    call () = rxn1_start();
+                }
+                (pc == block1) : {
+                    call () = rxn1_block1();
+                }
+                (pc == block2) : {
+                    call () = rxn1_block2();
+                }
+            esac
+        }
+        else {
+            delay' = delay - 1;
+        }
+    }
+}
+
+module main {
+    type * = Reactor_Sink.*;
+
+    var n : integer;
+
+    instance b : Reactor_Sink();
+    instance c : Reactor_Sink();
+
+    init {
+        n = 0;
+    }
+
+    next {
+        next(b);
+        next(c);
+    }
+
+    // Main properties
+    invariant four_is_unsafe     : (b.s + c.s != 4);
+    invariant seven_is_unsafe    : (b.s + c.s != 7);
+    invariant eight_is_unsafe    : (b.s + c.s != 8);
+    invariant nine_is_unsafe     : (b.s + c.s != 9);
+    invariant ten_is_unsafe      : (b.s + c.s != 10);
+    invariant eleven_is_unsafe   : (b.s + c.s != 11);
+    invariant a_large_number_is_unsafe  : (b.s + c.s != 1215);
+    var i : integer;
+    invariant cannot_be_multiple_of_5   : (b.s + c.s != i * 5);
+
+    // Helper invariants
+    invariant helper0    : b.delay >= 0 && c.delay >= 0;            // Delay cannot be negative.
+    invariant helper1    : b.delay > 0 ==> b.pc == start;           // When there is a delay, pc is at start.
+    invariant helper2    : c.delay > 0 ==> c.pc == start;           // Same as above.
+    invariant helper3    : n >= 0;                                  // The scaling factor is non-negative.
+    invariant helper4    : b.pc == start ==> b.s == n * 6;          // Prior to executing start, the state is a multiple of 6.
+    invariant helper5    : b.pc == block1 ==> b.s == n * 6 + 1;     // Prior to executing block1, the state is a multiple of 6 plus 1.
+    invariant helper6    : b.pc == block2 ==> b.s == n * 6 + 1 + 2; // Prior to executing block1, the state is a multiple of 6 plus 3.
+    invariant helper7    : b.pc == end ==> b.s == (n + 1) * 6;      // Prior to executing block1, the state is a multiple of 6 with (n+1).
+    invariant helper8    : c.pc == start ==> c.s == n * 6;          // Same as above.
+    invariant helper9    : c.pc == block1 ==> c.s == n * 6 + 1;     // Same as above.
+    invariant helper10   : c.pc == block2 ==> c.s == n * 6 + 1 + 2; // Same as above.
+    invariant helper11   : c.pc == end ==> c.s == (n + 1) * 6;      // Same as above.
+
+    control {
+        v = induction;
+        check;
+        print_results;
+        v.print_cex(
+            b.delay, b.s, b.pc,
+            c.delay, c.s, c.pc,
+            n, i
+        );
+    }
+}
+
+
+
