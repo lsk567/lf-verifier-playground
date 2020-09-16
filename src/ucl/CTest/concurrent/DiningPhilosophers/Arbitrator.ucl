@@ -1,0 +1,162 @@
+/**
+ * Defines the arbitrator reactor class in the dining
+ * philosophers problem.
+ *
+ * This encoding intends to perform proof by induction
+ * and will use direct wiring rather than using a
+ * scheduler to facilitate message delivery.
+ *
+ * To simplify the model, here we assume that present
+ * boolean signals are true, otherwise they are absent.
+ *
+ * @author Shaokai Lin
+ *
+ * FIXME:
+ * 1. Multiple updates
+ * 2. Invalid module output
+ */
+
+module Arbitrator {
+    const num_philosophers : bv1 = 1bv1;
+    input count : bv1;
+    
+    input philosopher_finished : [bv1]boolean;
+    // input philosopher_finished_present : boolean;
+    input hungry : [bv1]boolean;
+    // input hungry_present : boolean;
+    input done : [bv1]boolean;
+    // input done_present : boolean;
+    output philosopher_start : [bv1]boolean;
+    output eat : [bv1]boolean;
+    output denied : [bv1]boolean;
+
+    input start : boolean;
+    // input start_present : boolean;
+    output finished : boolean;
+
+    var forks : [bv1]boolean;
+    var finished_philosophers : integer;
+    var arbitration_id : bv1;
+    var retries : integer;
+
+    // Helper functions
+    procedure free_forks(_i : bv1)
+        modifies forks;
+        // ensures (forks[_i] == false && forks[_i + 1bv1] == false);
+    {
+        forks[_i] = false;
+        forks[_i + 1bv1] = false;
+    }
+
+    // Reaction triggered by start
+    procedure rxn2()
+        modifies finished_philosophers, retries, philosopher_start;
+    {
+        finished_philosophers = 0;
+        retries = 0;
+
+        for (i : bv1) in range(0bv1, num_philosophers) {
+            philosopher_start[i] = true;
+        }
+    }
+
+    // Reaction triggered by done
+    procedure rxn3()
+        modifies forks;
+        // requires (exists (i : bv1) :: done[i] == true && forks[i] == true);
+        // ensures (forall (i : bv1) :: forks[i] == false);
+    {
+        for (i : bv1) in range(0bv1, num_philosophers) {
+            if (done[i]) {
+                call () = free_forks(i);
+            }
+        }
+    }
+
+    // Reaction triggered by hungry
+    procedure rxn4()
+        modifies eat, denied, forks, retries, arbitration_id;
+    {
+        var j : bv1;
+        var success : bv1;
+
+        for (i : bv1) in range(0bv1, num_philosophers) {
+            j = i + arbitration_id;
+            if (hungry[j]) {
+                // Attempt to acquire forks
+                if (forks[j] || forks[j+1bv1]) {
+                    eat[j] = false;
+                    denied[j] = true;
+                    retries = retries + 1;
+                }
+                else {
+                    forks[j] = true;
+                    forks[j+1bv1] = true;
+                    eat[j] = true;
+                }
+            }
+        }
+
+        arbitration_id = arbitration_id + 1bv1;
+    }
+
+    // Reaction triggered by philosopher_finished
+    procedure rxn5()
+        modifies finished_philosophers;
+    {
+        // philosopher_finished_width == num_philosopher
+        for (i : bv1) in range(0bv1, num_philosophers) {
+            if (philosopher_finished[i]) {
+                finished_philosophers = finished_philosophers + 1;
+            }
+        }
+    }
+
+    procedure trigger_reactions()
+        modifies forks, retries, eat, arbitration_id, denied, retries, finished_philosophers, philosopher_start; 
+    {
+        call () = rxn2();
+        call () = rxn3();
+        call () = rxn4();
+        call () = rxn5();
+    }
+
+    init {
+        assume(forall (i : bv1) :: philosopher_start[i] == false);
+        assume(forall (i : bv1) :: philosopher_finished[i] == false);
+        assume(forall (i : bv1) :: hungry[i] == false);
+        assume(forall (i : bv1) :: done[i] == false);
+        assume(forall (i : bv1) :: eat[i] == false);
+        assume(forall (i : bv1) :: denied[i] == false);
+        // assume(start == false);
+        assume(finished == false);
+        assume(forall (i : bv1) :: forks[i] == false);
+        assume(finished_philosophers == 0);
+        assume(arbitration_id == 0bv1);
+        assume(retries == 0);
+        
+        /*
+        assume(philosopher_finished_present == false);
+        assume(start_present == false);
+        assume(done_present == false);
+        assume(hungry_present == false);
+        */
+    }
+
+    next {
+        call () = trigger_reactions();
+    }
+
+    property[LTL] test : !F(finished == true);
+
+    control {
+        // v1 = verify(free_forks);
+        // v2 = verify(rxn3);
+        v = bmc(5);
+        check;
+        print_results;
+        // v1.print_cex();
+        // v2.print_cex();
+        v.print_cex();
+    }
+}

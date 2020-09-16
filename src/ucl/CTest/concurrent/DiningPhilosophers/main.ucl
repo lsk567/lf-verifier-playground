@@ -1,0 +1,169 @@
+module main {
+    var step : integer;
+
+    const num_philosophers : bv1 = 1bv1;
+    var count : bv1;
+    
+    var philosopher_finished : [bv1]boolean;
+    // var philosopher_finished_present : boolean;
+    var hungry : [bv1]boolean;
+    // var hungry_present : boolean;
+    var done : [bv1]boolean;
+    // var done_present : boolean;
+    var philosopher_start : [bv1]boolean;
+    var eat : [bv1]boolean;
+    var denied : [bv1]boolean;
+
+    // var start : boolean;
+    // var start_present : boolean;
+    var finished : boolean;
+
+    // Temporary output variables
+    var p1_finished : boolean;
+    var p1_hungry : boolean;
+    var p1_done : boolean;
+    var p2_finished : boolean;
+    var p2_hungry : boolean;
+    var p2_done : boolean;
+
+    /*
+    var count : integer;
+    var eating_time : integer;
+    assume(eating_time == 1);
+    var _instance : integer;
+    var thinking_time : integer;
+    var starvation_threshold : integer;
+
+    var start : boolean;
+    var finished : boolean;
+
+    var eat : boolean;
+    var denied : boolean;
+    var hungry : boolean;
+    var done : boolean;
+    */
+
+    instance a : Arbitrator(
+        // Input
+        philosopher_finished : (philosopher_finished),
+        // philosopher_finished_present : (philosopher_finished_present),
+        hungry : (hungry),
+        // hungry_present : (hungry_present),
+        done : (done),
+        // done_present : (done_present),
+        start : (true),
+        // start_present : (start_present),
+        // Output
+        philosopher_start : (philosopher_start),
+        eat : (eat),
+        denied : (denied),
+        finished : (finished)
+    );
+    instance p1 : Philosopher(
+        // Constructor
+        _instance : (1),
+        count : (5),
+        eating_time : (1),
+        thinking_time : (1),
+        starvation_threshold : (10),
+        // Input
+        start : (a.philosopher_start[0bv1]),
+        eat : (a.eat[0bv1]),
+        denied : (a.denied[0bv1]),
+        // Output
+        finished : (p1_finished),
+        hungry : (p1_hungry),
+        done : (p1_done)
+    );
+    instance p2 : Philosopher(
+        // Constructor
+        _instance : (2),
+        count : (5),
+        eating_time : (1),
+        thinking_time : (1),
+        starvation_threshold : (10),
+        // Input
+        start : (a.philosopher_start[1bv1]),
+        eat : (a.eat[1bv1]),
+        denied : (a.denied[1bv1]),
+        // Output
+        finished : (p2_finished),
+        hungry : (p2_hungry),
+        done : (p2_done)
+    );
+
+    procedure update_arrays()
+        modifies philosopher_finished, hungry, done;
+    {
+        philosopher_finished[0bv1] = p1_finished;
+        philosopher_finished[1bv1] = p2_finished;
+        hungry[0bv1] = p1_hungry;
+        hungry[1bv1] = p2_hungry;
+        done[0bv1] = p1_done;
+        done[1bv1] = p2_done;
+    }
+
+    init {
+        step = 0;
+
+        count = 1bv1;
+        philosopher_finished[0bv1] = false;
+        philosopher_finished[1bv1] = false;
+        hungry[0bv1] = false;
+        hungry[1bv1] = false;
+        done[0bv1] = false;
+        done[1bv1] = false;
+        philosopher_start[0bv1] = false;
+        philosopher_start[1bv1] = false;
+        eat[0bv1] = false;
+        eat[1bv1] = false;
+        denied[0bv1] = false;
+        denied[1bv1] = false;
+        // start = false; // Send the initial start signal
+        finished = false;
+
+        // Temporary output variables
+        p1_finished = false;
+        p1_hungry = false;
+        p1_done = false;
+        p2_finished = false;
+        p2_hungry = false;
+        p2_done = false;
+    }
+
+    init {
+        step = 0;
+    }
+
+    next {
+        call () = update_arrays(); 
+        next(a);
+        next(p1);
+        next(p2);
+
+        step' = step + 1;
+    }
+
+    // invariant deadlock : (p1.denied && p2.denied); 
+    // property[LTL] test : !F(p1.denied || p2.denied); 
+    // property[LTL] test2 : !F(a.philosopher_start[0bv1]);
+    property[LTL] _step : !F(step == 1);
+
+    control {
+        // v = induction;
+        v = bmc(5);
+        check;
+        print_results;
+        v.print_cex(
+            step,
+            a.philosopher_start,
+            p1.start,
+            p2.start,
+            p1.hungry,
+            p2.hungry,
+            p1_hungry,
+            p2_hungry,
+            hungry
+        );
+    }
+}

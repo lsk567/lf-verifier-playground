@@ -1,0 +1,121 @@
+module Philosopher {
+    // Params
+    input count : integer;
+    input eating_time : integer;
+    // assume(eating_time == 1);
+    input _instance : integer;
+    input thinking_time : integer;
+    input starvation_threshold : integer;
+
+    input start : boolean;
+    output finished : boolean;
+
+    input eat : boolean;
+    input denied : boolean;
+    output hungry : boolean;
+    output done : boolean;
+
+    var times_eaten : integer;
+    var times_denied: integer;
+
+    // Logical actions
+    var done_eating : boolean;
+    var done_thinking : boolean;
+
+    // Triggered by start
+    procedure rxn0()
+        modifies times_eaten, times_denied, hungry;
+    {
+        times_eaten = 0;
+        times_denied = 0;
+
+        hungry = true;
+    }
+
+    // Triggered by done_eating
+    procedure rxn1()
+        modifies done, done_thinking, finished;
+    {
+        done = true;
+
+        if (times_eaten < count) {
+            done_thinking = true;
+        }
+        else {
+            finished = true;
+        }
+    }
+
+    // Triggered by done_thinking
+    procedure rxn2()
+        modifies hungry;
+    {
+        hungry = true;
+    }
+
+    // Triggered by eat
+    procedure rxn3()
+        modifies times_eaten, times_denied, done_eating;
+    {
+        times_eaten = times_eaten + 1;
+        times_denied = 0;
+
+        done_eating = true;
+    }
+
+    // Triggered by denied
+    procedure rxn4()
+        modifies times_denied, done_thinking;
+    {
+        times_denied = times_denied + 1;
+
+        done_thinking = true;
+    }
+
+    init {
+        times_eaten = 0;
+        times_denied = 0;
+        done_eating = false;
+        done_thinking = false;
+    }
+
+    next {
+        case
+            (start) : {
+                call () = rxn0();
+                /*
+                havoc start;
+                assume(start == false);
+                */
+            }
+            (done_eating) : {
+                call () = rxn1();
+                /*
+                havoc done_eating;
+                assume(done_eating == false);
+                */
+            }
+            (done_thinking) : {
+                call () = rxn2();
+                /*
+                havoc done_thinking;
+                assume(done_thinking == false);
+                */
+            }
+            (eat) : {
+                call () = rxn3();
+                /*
+                havoc eat;
+                assume(eat == false);
+                */
+            }
+            (denied) : {
+                call () = rxn4();
+                /*
+                havoc denied;
+                assume(denied == false);
+                */
+            }
+        esac
+    }
+}
