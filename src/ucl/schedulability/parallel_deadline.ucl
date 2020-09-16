@@ -1,6 +1,6 @@
 /**
  * Have concrete exec. time estimate and
- * look for violating schedules.
+ * look for satisfying schedules.
  */
 
 module A {
@@ -75,7 +75,7 @@ module E {
     input start : integer;
     output finish : integer;
 
-    const exec_time : integer = 3; // 3 + 3 > 5
+    const exec_time : integer = 1; // 3 + 1 < 5
     const ddl : integer = 5; // assume the current timestamp is 0.
 
     var ddl_violation : boolean;
@@ -150,14 +150,6 @@ module main {
     init {
         step = 0;
         current_physical_time = 0;
-        
-        /*
-        running = RB;
-        schedule[0] = RB;
-        schedule[1] = RC;
-        schedule[2] = RD;
-        schedule[3] = RE;
-        */
     }
 
     next {
@@ -196,13 +188,10 @@ module main {
         }
     }
 
-    // property no_c_ddl_violation : c.ddl_violation == false;
-    property[LTL] no_c_ddl_violation : G(c.ddl_violation == false);
-    // property[LTL] test : (current_physical_time == -10);
+    property[LTL] no_c_ddl_violation : !F(step == 4 && e.ddl_violation == false);
 
     control {
         v = bmc(5);
-        // v = induction;
         check;
         print_results;
         v.print_cex(

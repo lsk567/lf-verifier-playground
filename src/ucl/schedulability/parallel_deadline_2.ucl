@@ -1,6 +1,6 @@
 /**
  * Have concrete exec. time estimate and
- * look for satisfying schedules.
+ * look for violating schedules.
  */
 
 module A {
@@ -150,6 +150,14 @@ module main {
     init {
         step = 0;
         current_physical_time = 0;
+        
+        /*
+        running = RB;
+        schedule[0] = RB;
+        schedule[1] = RC;
+        schedule[2] = RD;
+        schedule[3] = RE;
+        */
     }
 
     next {
@@ -188,7 +196,8 @@ module main {
         }
     }
 
-    property[LTL] no_c_ddl_violation : G(step == 4 ==> c.ddl_violation == true);
+    // property no_c_ddl_violation : c.ddl_violation == false;
+    property[LTL] no_c_ddl_violation : G(c.ddl_violation == false);
     // property[LTL] test : (current_physical_time == -10);
 
     control {
