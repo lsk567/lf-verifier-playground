@@ -1,3 +1,16 @@
+/**
+ * Defines the main module of the model
+ *
+ * This encoding intends to perform proof by induction
+ * and will use direct wiring rather than using a
+ * scheduler to facilitate message transfer.
+ *
+ * To simplify the model, here we assume that present
+ * boolean signals are true, otherwise they are absent.
+ *
+ * @author Shaokai Lin
+ */
+
 module main {
     var step : integer;
 
@@ -114,7 +127,8 @@ module main {
         step' = step + 1;
     }
 
-    invariant deadlock : (a.forks[0bv1] == a.forks[1bv1]); 
+    // invariant deadlock : (a.forks[0bv1] != a.forks[1bv1]); 
+    invariant no_deadlock : (a.forks[0bv1] == a.forks[1bv1]); 
     // property[LTL] _step : !F(step == 1); // For debugging
     // property[LTL] deadlock_ltl : !F(a.forks[0bv1] != a.forks[1bv1]);
 

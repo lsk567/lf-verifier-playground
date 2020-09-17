@@ -2,17 +2,7 @@
  * Defines the arbitrator reactor class in the dining
  * philosophers problem.
  *
- * This encoding intends to perform proof by induction
- * and will use direct wiring rather than using a
- * scheduler to facilitate message delivery.
- *
- * To simplify the model, here we assume that present
- * boolean signals are true, otherwise they are absent.
- *
  * @author Shaokai Lin
- *
- * FIXME:
- * 1. prove deadlock free property via induction.
  */
 
 module Arbitrator {
@@ -165,12 +155,6 @@ module Arbitrator {
         assume(retries == 0);
         
         start = true;
-        /*
-        assume(philosopher_finished_present == false);
-        assume(start_present == false);
-        assume(done_present == false);
-        assume(hungry_present == false);
-        */
         pc = null;
     }
 

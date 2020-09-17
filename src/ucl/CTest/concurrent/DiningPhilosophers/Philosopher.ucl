@@ -1,3 +1,10 @@
+/**
+ * Defines the philosopher reactor class in the dining
+ * philosophers problem.
+ *
+ * @author Shaokai Lin
+ */
+
 module Philosopher {
     type pc_t = enum {null2, rxn0_start, rxn1_done_eating, rxn2_done_thinking, rxn3_loading_eat, rxn3_eat, rxn4_denied};
     var pc : pc_t;
