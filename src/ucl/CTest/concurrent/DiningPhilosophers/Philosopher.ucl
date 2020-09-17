@@ -34,8 +34,12 @@ module Philosopher {
 
     // Triggered by done_eating
     procedure rxn1()
-        modifies done, done_thinking, finished;
+        modifies done_eating; // trigger, to be reset
+        modifies hungry, done, done_thinking, finished;
     {
+        hungry = false; // Explicit set hungry to false
+        done_eating = false;
+
         done = true;
 
         if (times_eaten < count) {
@@ -48,8 +52,11 @@ module Philosopher {
 
     // Triggered by done_thinking
     procedure rxn2()
+        modifies done_thinking; // trigger, to be reset
         modifies hungry;
     {
+        done_thinking = false;
+
         hungry = true;
     }
 
@@ -83,10 +90,8 @@ module Philosopher {
         case
             (start) : {
                 call () = rxn0();
-                /*
-                havoc start;
-                assume(start == false);
-                */
+                // havoc start;
+                // assume(start == false);
             }
             (done_eating) : {
                 call () = rxn1();

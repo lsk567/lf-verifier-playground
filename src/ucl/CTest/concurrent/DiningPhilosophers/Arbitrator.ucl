@@ -12,8 +12,16 @@
  * @author Shaokai Lin
  *
  * FIXME:
- * 1. Multiple updates
- * 2. Invalid module output
+ * 1. eat state toggling in a strange way
+ * 2. done takes 3 steps to propagate to arbitrator (step #6)
+ * 3. why is p1/p2_hungry not cleared.
+ * 4. forks do not appear to be freed because it depends on done
+ *    and done takes multiple steps to propagate. Then arbitration_id
+ *    ...
+ * 5. P1's initial done is processed at step #7. P1 is eating again.. since arb_id is 0.
+ * 6. at Step 6, 1st done propagates to arbitrator, p2 starts eating. p1 done and not hungry. a perfect state.
+ * 7. Times_eaten not incrementing - central question. Is the reaction being overriden by start, done_eating,
+ * done_thinking? 
  */
 
 module Arbitrator {
@@ -30,7 +38,8 @@ module Arbitrator {
     output eat : [bv1]boolean;
     output denied : [bv1]boolean;
 
-    input start : boolean;
+    // input start : boolean;
+    output start : boolean;
     // input start_present : boolean;
     output finished : boolean;
 
@@ -40,6 +49,7 @@ module Arbitrator {
     var retries : integer;
 
     // Helper functions
+    /*
     procedure free_forks(_i : bv1)
         modifies forks;
         // ensures (forks[_i] == false && forks[_i + 1bv1] == false);
@@ -47,17 +57,25 @@ module Arbitrator {
         forks[_i] = false;
         forks[_i + 1bv1] = false;
     }
+    */
 
     // Reaction triggered by start
     procedure rxn2()
-        modifies finished_philosophers, retries, philosopher_start;
+        modifies start, finished_philosophers, retries, philosopher_start;
     {
         finished_philosophers = 0;
         retries = 0;
 
         for (i : bv1) in range(0bv1, num_philosophers) {
-            philosopher_start[i] = true;
+            if (start) {
+                philosopher_start[i] = true;
+            }
+            else {
+                philosopher_start[i] = false;
+            }
         }
+
+        start = false;
     }
 
     // Reaction triggered by done
@@ -68,7 +86,9 @@ module Arbitrator {
     {
         for (i : bv1) in range(0bv1, num_philosophers) {
             if (done[i]) {
-                call () = free_forks(i);
+                // call () = free_forks(i);
+                forks[i] = false;
+                forks[i + 1bv1] = false;
             }
         }
     }
@@ -96,7 +116,9 @@ module Arbitrator {
                 }
             }
         }
-
+        
+        // Only increment arbitration_id after
+        // 1 successful grab
         arbitration_id = arbitration_id + 1bv1;
     }
 
@@ -113,7 +135,7 @@ module Arbitrator {
     }
 
     procedure trigger_reactions()
-        modifies forks, retries, eat, arbitration_id, denied, retries, finished_philosophers, philosopher_start; 
+        modifies start, forks, retries, eat, arbitration_id, denied, retries, finished_philosophers, philosopher_start; 
     {
         call () = rxn2();
         call () = rxn3();
@@ -128,13 +150,13 @@ module Arbitrator {
         assume(forall (i : bv1) :: done[i] == false);
         assume(forall (i : bv1) :: eat[i] == false);
         assume(forall (i : bv1) :: denied[i] == false);
-        // assume(start == false);
         assume(finished == false);
         assume(forall (i : bv1) :: forks[i] == false);
         assume(finished_philosophers == 0);
         assume(arbitration_id == 0bv1);
         assume(retries == 0);
         
+        start = true;
         /*
         assume(philosopher_finished_present == false);
         assume(start_present == false);

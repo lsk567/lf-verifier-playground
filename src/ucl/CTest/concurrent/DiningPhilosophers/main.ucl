@@ -14,7 +14,7 @@ module main {
     var eat : [bv1]boolean;
     var denied : [bv1]boolean;
 
-    // var start : boolean;
+    var start : boolean;
     // var start_present : boolean;
     var finished : boolean;
 
@@ -26,23 +26,6 @@ module main {
     var p2_hungry : boolean;
     var p2_done : boolean;
 
-    /*
-    var count : integer;
-    var eating_time : integer;
-    assume(eating_time == 1);
-    var _instance : integer;
-    var thinking_time : integer;
-    var starvation_threshold : integer;
-
-    var start : boolean;
-    var finished : boolean;
-
-    var eat : boolean;
-    var denied : boolean;
-    var hungry : boolean;
-    var done : boolean;
-    */
-
     instance a : Arbitrator(
         // Input
         philosopher_finished : (philosopher_finished),
@@ -51,7 +34,7 @@ module main {
         // hungry_present : (hungry_present),
         done : (done),
         // done_present : (done_present),
-        start : (true),
+        start : (start),
         // start_present : (start_present),
         // Output
         philosopher_start : (philosopher_start),
@@ -151,19 +134,45 @@ module main {
 
     control {
         // v = induction;
-        v = bmc(5);
+        v = bmc(10);
         check;
         print_results;
         v.print_cex(
             step,
+            a.arbitration_id,
             a.philosopher_start,
             p1.start,
             p2.start,
             p1.hungry,
             p2.hungry,
+            p1.eat,
+            p2.eat,
+            p1.denied,
+            p2.denied,
+            p1.done,
+            p2.done,
+            a.done,
+            done,
+            p1.times_eaten,
+            p2.times_eaten,
+            p1.times_denied,
+            p2.times_denied,
+            p1.done_eating,
+            p2.done_eating,
+            p1.done_thinking,
+            p2.done_thinking,
             p1_hungry,
             p2_hungry,
-            hungry
+            p1_done,
+            p2_done,
+            hungry,
+            a.hungry,
+            a.forks,
+            a.eat,
+            a.denied,
+            a.retries,
+            a.start,
+            start
         );
     }
 }
