@@ -38,8 +38,8 @@ module main {
         // Constructor
         _instance : (1),
         count : (5),
-        eating_time : (1),
-        thinking_time : (1),
+        eating_time : (2),
+        thinking_time : (2),
         starvation_threshold : (10),
         // Input
         start : (a.philosopher_start[0bv1]),
@@ -54,8 +54,8 @@ module main {
         // Constructor
         _instance : (2),
         count : (5),
-        eating_time : (1),
-        thinking_time : (1),
+        eating_time : (2),
+        thinking_time : (2),
         starvation_threshold : (10),
         // Input
         start : (a.philosopher_start[1bv1]),
@@ -120,7 +120,7 @@ module main {
 
     control {
         v = induction;
-        // v = bmc(20);
+        // v = bmc(10);
         check;
         print_results;
         v.print_cex(
@@ -133,7 +133,7 @@ module main {
             p0_hungry,
             p1_hungry,
             // Arbitrator
-            a.pc,
+            // a.pc,
             a.arbitration_id,
             a.philosopher_start,
             a.done,
@@ -148,23 +148,33 @@ module main {
             p0.start,
             p0.hungry,
             p0.eat,
+            p0._eat,
+            p0.delay_eating,
             p0.denied,
             p0.done,
             p0.times_eaten,
             p0.times_denied,
             p0.done_eating,
             p0.done_thinking,
+            p0.delay_thinking,
+            p0.eating_time,
+            p0.thinking_time,
             // P1
             p1.pc,
             p1.start,
             p1.hungry,
             p1.eat,
+            p1._eat,
+            p1.delay_eating,
             p1.denied,
             p1.done,
             p1.times_eaten,
             p1.times_denied,
             p1.done_eating,
-            p1.done_thinking
+            p1.done_thinking,
+            p1.delay_thinking,
+            p1.eating_time,
+            p1.thinking_time
         );
     }
 }

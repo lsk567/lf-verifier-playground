@@ -1,5 +1,5 @@
 module Philosopher {
-    type pc_t = enum {null2, rxn0_start, rxn1_done_eating, rxn2_done_thinking, rxn3_eat, rxn4_denied};
+    type pc_t = enum {null2, rxn0_start, rxn1_done_eating, rxn2_done_thinking, rxn3_loading_eat, rxn3_eat, rxn4_denied};
     var pc : pc_t;
 
     // Params
@@ -13,6 +13,7 @@ module Philosopher {
     output finished : boolean;
 
     input eat : boolean;
+    var _eat : boolean;
     input denied : boolean;
     output hungry : boolean;
     output done : boolean;
@@ -23,6 +24,10 @@ module Philosopher {
     // Logical actions
     var done_eating : boolean;
     var done_thinking : boolean;
+
+    // Delays
+    var delay_eating : integer;
+    var delay_thinking : integer;
 
     // Triggered by start
     procedure rxn0()
@@ -70,11 +75,22 @@ module Philosopher {
     }
 
     // Triggered by eat
-    procedure rxn3()
+    procedure rxn3_1()
         modifies pc;
+        modifies _eat;
+    {
+        pc = rxn3_loading_eat;
+        _eat = eat;
+    }
+    procedure rxn3_2()
+        modifies pc;
+        modifies _eat;
+        modifies delay_eating;
         modifies hungry, times_eaten, times_denied, done_eating;
     {
         pc = rxn3_eat;
+        _eat = false;
+        delay_eating = eating_time;
         hungry = false; // Explicit set hungry to false
 
         times_eaten = times_eaten + 1;
@@ -86,9 +102,11 @@ module Philosopher {
     // Triggered by denied
     procedure rxn4()
         modifies pc;
+        modifies delay_thinking;
         modifies times_denied, done_thinking;
     {
         pc = rxn4_denied;
+        delay_thinking = thinking_time;
         times_denied = times_denied + 1;
 
         done_thinking = true;
@@ -96,10 +114,13 @@ module Philosopher {
 
     init {
         pc = null2;
+        _eat = false;
         times_eaten = 0;
         times_denied = 0;
         done_eating = false;
         done_thinking = false;
+        delay_eating = eating_time;
+        delay_thinking = thinking_time;
     }
 
     next {
@@ -108,10 +129,25 @@ module Philosopher {
                 call () = rxn0();
             }
             (eat) : {
-                call () = rxn3();
+                call () = rxn3_1();
+            }
+            (_eat) : {
+                if (delay_eating > 0) {
+                    delay_eating' = delay_eating - 1;
+                    pc' = null2;
+                }
+                else {
+                    call () = rxn3_2();
+                }
             }
             (done_eating) : {
-                call () = rxn1();
+                if (delay_thinking > 0) {
+                    delay_thinking' = delay_thinking - 1;
+                    pc' = null2;
+                }
+                else {
+                    call () = rxn1();
+                }
             }
             (done_thinking) : {
                 call () = rxn2();
