@@ -12,16 +12,7 @@
  * @author Shaokai Lin
  *
  * FIXME:
- * 1. eat state toggling in a strange way
- * 2. done takes 3 steps to propagate to arbitrator (step #6)
- * 3. why is p1/p2_hungry not cleared.
- * 4. forks do not appear to be freed because it depends on done
- *    and done takes multiple steps to propagate. Then arbitration_id
- *    ...
- * 5. P1's initial done is processed at step #7. P1 is eating again.. since arb_id is 0.
- * 6. at Step 6, 1st done propagates to arbitrator, p2 starts eating. p1 done and not hungry. a perfect state.
- * 7. Times_eaten not incrementing - central question. Is the reaction being overriden by start, done_eating,
- * done_thinking? 
+ * 1. prove deadlock free property via induction.
  */
 
 module Arbitrator {
@@ -32,35 +23,29 @@ module Arbitrator {
     input count : bv1;
     
     input philosopher_finished : [bv1]boolean;
-    // input philosopher_finished_present : boolean;
     input hungry : [bv1]boolean;
-    // input hungry_present : boolean;
     input done : [bv1]boolean;
-    // input done_present : boolean;
     output philosopher_start : [bv1]boolean;
     output eat : [bv1]boolean;
     output denied : [bv1]boolean;
 
     // input start : boolean;
     output start : boolean;
-    // input start_present : boolean;
     output finished : boolean;
 
-    var forks : [bv1]boolean;
+    var forks : [bv1]integer;
     var finished_philosophers : integer;
     var arbitration_id : bv1;
     var retries : integer;
 
     // Helper functions
-    /*
     procedure free_forks(_i : bv1)
         modifies forks;
         // ensures (forks[_i] == false && forks[_i + 1bv1] == false);
     {
-        forks[_i] = false;
-        forks[_i + 1bv1] = false;
+        forks[_i] = -1;
+        forks[_i + 1bv1] = -1;
     }
-    */
 
     // Reaction triggered by start
     procedure rxn2()
@@ -93,9 +78,9 @@ module Arbitrator {
         pc = rxn3_done;
         for (i : bv1) in range(0bv1, num_philosophers) {
             if (done[i]) {
-                // call () = free_forks(i);
-                forks[i] = false;
-                forks[i + 1bv1] = false;
+                call () = free_forks(i);
+                // forks[i] = false;
+                // forks[i + 1bv1] = false;
             }
         }
     }
@@ -114,18 +99,24 @@ module Arbitrator {
             j = i + arbitration_id;
             if (hungry[j]) {
                 // Attempt to acquire forks
-                if (forks[j] || forks[j+1bv1]) {
+                if (forks[j] != -1 || forks[j+1bv1] != -1) {
                     eat[j] = false;
                     denied[j] = true;
                     retries = retries + 1;
                 }
                 else {
-                    forks[j] = true;
-                    forks[j+1bv1] = true;
+                    if (j == 0bv1) {
+                        forks[j] = 0;
+                        forks[j+1bv1] = 0;
+                    }
+                    else {
+                        forks[j] = 1;
+                        forks[j+1bv1] = 1;
+                    }
+
                     eat[j] = true;
                     denied[j] = false; // If you start eating, cannot deny the same philosopher.
                     eat_issued = true;
-                    // arbitration_id = arbitration_id + 1bv1;
                 }
             }
         }
@@ -168,7 +159,7 @@ module Arbitrator {
         assume(forall (i : bv1) :: eat[i] == false);
         assume(forall (i : bv1) :: denied[i] == false);
         assume(finished == false);
-        assume(forall (i : bv1) :: forks[i] == false);
+        assume(forall (i : bv1) :: forks[i] == -1);
         assume(finished_philosophers == 0);
         assume(arbitration_id == 0bv1);
         assume(retries == 0);
@@ -187,16 +178,18 @@ module Arbitrator {
         call () = trigger_reactions();
     }
 
+    /*
     property[LTL] test : !F(finished == true);
 
     control {
-        // v1 = verify(free_forks);
-        // v2 = verify(rxn3);
+        v1 = verify(free_forks);
+        v2 = verify(rxn3);
         v = bmc(5);
         check;
         print_results;
-        // v1.print_cex();
-        // v2.print_cex();
+        v1.print_cex();
+        v2.print_cex();
         v.print_cex();
     }
+    */
 }

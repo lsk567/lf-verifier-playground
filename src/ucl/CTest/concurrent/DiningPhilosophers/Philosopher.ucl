@@ -5,7 +5,6 @@ module Philosopher {
     // Params
     input count : integer;
     input eating_time : integer;
-    // assume(eating_time == 1);
     input _instance : integer;
     input thinking_time : integer;
     input starvation_threshold : integer;
@@ -121,23 +120,5 @@ module Philosopher {
                 call () = rxn4();
             }
         esac
-
-        /*
-        if (start) {
-            call () = rxn0();
-        }
-        if (done_eating) {
-            call () = rxn1();
-        }
-        if (done_thinking) {
-            call () = rxn2();
-        }
-        if (eat) {
-            call () = rxn3();
-        }
-        if (denied) {
-            call () = rxn4();
-        }
-        */
     }
 }

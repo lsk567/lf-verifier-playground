@@ -5,17 +5,13 @@ module main {
     var count : bv1;
     
     var philosopher_finished : [bv1]boolean;
-    // var philosopher_finished_present : boolean;
     var hungry : [bv1]boolean;
-    // var hungry_present : boolean;
     var done : [bv1]boolean;
-    // var done_present : boolean;
     var philosopher_start : [bv1]boolean;
     var eat : [bv1]boolean;
     var denied : [bv1]boolean;
 
     var start : boolean;
-    // var start_present : boolean;
     var finished : boolean;
 
     // Temporary output variables
@@ -29,13 +25,9 @@ module main {
     instance a : Arbitrator(
         // Input
         philosopher_finished : (philosopher_finished),
-        // philosopher_finished_present : (philosopher_finished_present),
         hungry : (hungry),
-        // hungry_present : (hungry_present),
         done : (done),
-        // done_present : (done_present),
         start : (start),
-        // start_present : (start_present),
         // Output
         philosopher_start : (philosopher_start),
         eat : (eat),
@@ -102,7 +94,6 @@ module main {
         eat[1bv1] = false;
         denied[0bv1] = false;
         denied[1bv1] = false;
-        // start = false; // Send the initial start signal
         finished = false;
 
         // Temporary output variables
@@ -123,10 +114,9 @@ module main {
         step' = step + 1;
     }
 
-    // invariant deadlock : (p1.denied && p2.denied); 
-    // property[LTL] test : !F(p1.denied || p2.denied); 
-    // property[LTL] test2 : !F(a.philosopher_start[0bv1]);
-    property[LTL] _step : !F(step == 1);
+    // invariant deadlock : (p0.denied && p1.denied); 
+    // property[LTL] _step : !F(step == 1); // For debugging
+    property[LTL] deadlock_ltl : !F(a.forks[0bv1] != a.forks[1bv1]);
 
     control {
         // v = induction;
