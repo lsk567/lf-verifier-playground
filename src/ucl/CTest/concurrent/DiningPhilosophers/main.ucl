@@ -19,12 +19,12 @@ module main {
     var finished : boolean;
 
     // Temporary output variables
+    var p0_finished : boolean;
+    var p0_hungry : boolean;
+    var p0_done : boolean;
     var p1_finished : boolean;
     var p1_hungry : boolean;
     var p1_done : boolean;
-    var p2_finished : boolean;
-    var p2_hungry : boolean;
-    var p2_done : boolean;
 
     instance a : Arbitrator(
         // Input
@@ -42,7 +42,7 @@ module main {
         denied : (denied),
         finished : (finished)
     );
-    instance p1 : Philosopher(
+    instance p0 : Philosopher(
         // Constructor
         _instance : (1),
         count : (5),
@@ -54,11 +54,11 @@ module main {
         eat : (a.eat[0bv1]),
         denied : (a.denied[0bv1]),
         // Output
-        finished : (p1_finished),
-        hungry : (p1_hungry),
-        done : (p1_done)
+        finished : (p0_finished),
+        hungry : (p0_hungry),
+        done : (p0_done)
     );
-    instance p2 : Philosopher(
+    instance p1 : Philosopher(
         // Constructor
         _instance : (2),
         count : (5),
@@ -70,20 +70,20 @@ module main {
         eat : (a.eat[1bv1]),
         denied : (a.denied[1bv1]),
         // Output
-        finished : (p2_finished),
-        hungry : (p2_hungry),
-        done : (p2_done)
+        finished : (p1_finished),
+        hungry : (p1_hungry),
+        done : (p1_done)
     );
 
     procedure update_arrays()
         modifies philosopher_finished, hungry, done;
     {
-        philosopher_finished[0bv1] = p1_finished;
-        philosopher_finished[1bv1] = p2_finished;
-        hungry[0bv1] = p1_hungry;
-        hungry[1bv1] = p2_hungry;
-        done[0bv1] = p1_done;
-        done[1bv1] = p2_done;
+        philosopher_finished[0bv1] = p0_finished;
+        philosopher_finished[1bv1] = p1_finished;
+        hungry[0bv1] = p0_hungry;
+        hungry[1bv1] = p1_hungry;
+        done[0bv1] = p0_done;
+        done[1bv1] = p1_done;
     }
 
     init {
@@ -106,23 +106,19 @@ module main {
         finished = false;
 
         // Temporary output variables
+        p0_finished = false;
+        p0_hungry = false;
+        p0_done = false;
         p1_finished = false;
         p1_hungry = false;
         p1_done = false;
-        p2_finished = false;
-        p2_hungry = false;
-        p2_done = false;
-    }
-
-    init {
-        step = 0;
     }
 
     next {
         call () = update_arrays(); 
         next(a);
+        next(p0);
         next(p1);
-        next(p2);
 
         step' = step + 1;
     }
@@ -134,45 +130,51 @@ module main {
 
     control {
         // v = induction;
-        v = bmc(10);
+        v = bmc(20);
         check;
         print_results;
         v.print_cex(
             step,
+            start,
+            done,
+            p0_done,
+            p1_done,
+            hungry,
+            p0_hungry,
+            p1_hungry,
+            // Arbitrator
+            a.pc,
             a.arbitration_id,
             a.philosopher_start,
-            p1.start,
-            p2.start,
-            p1.hungry,
-            p2.hungry,
-            p1.eat,
-            p2.eat,
-            p1.denied,
-            p2.denied,
-            p1.done,
-            p2.done,
             a.done,
-            done,
-            p1.times_eaten,
-            p2.times_eaten,
-            p1.times_denied,
-            p2.times_denied,
-            p1.done_eating,
-            p2.done_eating,
-            p1.done_thinking,
-            p2.done_thinking,
-            p1_hungry,
-            p2_hungry,
-            p1_done,
-            p2_done,
-            hungry,
             a.hungry,
             a.forks,
             a.eat,
             a.denied,
             a.retries,
             a.start,
-            start
+            // P0
+            p0.pc,
+            p0.start,
+            p0.hungry,
+            p0.eat,
+            p0.denied,
+            p0.done,
+            p0.times_eaten,
+            p0.times_denied,
+            p0.done_eating,
+            p0.done_thinking,
+            // P1
+            p1.pc,
+            p1.start,
+            p1.hungry,
+            p1.eat,
+            p1.denied,
+            p1.done,
+            p1.times_eaten,
+            p1.times_denied,
+            p1.done_eating,
+            p1.done_thinking
         );
     }
 }

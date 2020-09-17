@@ -25,6 +25,9 @@
  */
 
 module Arbitrator {
+    type pc_t = enum {null, rxn2_start, rxn3_done, rxn4_hungry, rxn5_philosopher_finished};
+    var pc : pc_t;
+
     const num_philosophers : bv1 = 1bv1;
     input count : bv1;
     
@@ -61,8 +64,10 @@ module Arbitrator {
 
     // Reaction triggered by start
     procedure rxn2()
+        modifies pc;
         modifies start, finished_philosophers, retries, philosopher_start;
     {
+        pc = rxn2_start;
         finished_philosophers = 0;
         retries = 0;
 
@@ -80,10 +85,12 @@ module Arbitrator {
 
     // Reaction triggered by done
     procedure rxn3()
+        modifies pc;
         modifies forks;
         // requires (exists (i : bv1) :: done[i] == true && forks[i] == true);
         // ensures (forall (i : bv1) :: forks[i] == false);
     {
+        pc = rxn3_done;
         for (i : bv1) in range(0bv1, num_philosophers) {
             if (done[i]) {
                 // call () = free_forks(i);
@@ -95,11 +102,14 @@ module Arbitrator {
 
     // Reaction triggered by hungry
     procedure rxn4()
+        modifies pc;
         modifies eat, denied, forks, retries, arbitration_id;
     {
         var j : bv1;
-        var success : bv1;
+        var eat_issued : boolean;
+        eat_issued = false;
 
+        pc = rxn4_hungry;
         for (i : bv1) in range(0bv1, num_philosophers) {
             j = i + arbitration_id;
             if (hungry[j]) {
@@ -113,19 +123,25 @@ module Arbitrator {
                     forks[j] = true;
                     forks[j+1bv1] = true;
                     eat[j] = true;
+                    denied[j] = false; // If you start eating, cannot deny the same philosopher.
+                    eat_issued = true;
+                    // arbitration_id = arbitration_id + 1bv1;
                 }
             }
         }
-        
         // Only increment arbitration_id after
         // 1 successful grab
-        arbitration_id = arbitration_id + 1bv1;
+        if (eat_issued) {
+            arbitration_id = arbitration_id + 1bv1;
+        }
     }
 
     // Reaction triggered by philosopher_finished
     procedure rxn5()
+        modifies pc;
         modifies finished_philosophers;
     {
+        pc = rxn5_philosopher_finished;
         // philosopher_finished_width == num_philosopher
         for (i : bv1) in range(0bv1, num_philosophers) {
             if (philosopher_finished[i]) {
@@ -135,11 +151,12 @@ module Arbitrator {
     }
 
     procedure trigger_reactions()
+        modifies pc;
         modifies start, forks, retries, eat, arbitration_id, denied, retries, finished_philosophers, philosopher_start; 
     {
         call () = rxn2();
+        call () = rxn4(); // Switching the order here because we want to see forks released.
         call () = rxn3();
-        call () = rxn4();
         call () = rxn5();
     }
 
@@ -163,6 +180,7 @@ module Arbitrator {
         assume(done_present == false);
         assume(hungry_present == false);
         */
+        pc = null;
     }
 
     next {

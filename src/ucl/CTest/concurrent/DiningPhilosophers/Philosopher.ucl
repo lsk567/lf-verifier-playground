@@ -1,4 +1,7 @@
 module Philosopher {
+    type pc_t = enum {null2, rxn0_start, rxn1_done_eating, rxn2_done_thinking, rxn3_eat, rxn4_denied};
+    var pc : pc_t;
+
     // Params
     input count : integer;
     input eating_time : integer;
@@ -24,8 +27,11 @@ module Philosopher {
 
     // Triggered by start
     procedure rxn0()
+        modifies pc;
         modifies times_eaten, times_denied, hungry;
     {
+        pc = rxn0_start;
+
         times_eaten = 0;
         times_denied = 0;
 
@@ -34,10 +40,11 @@ module Philosopher {
 
     // Triggered by done_eating
     procedure rxn1()
+        modifies pc;
         modifies done_eating; // trigger, to be reset
-        modifies hungry, done, done_thinking, finished;
+        modifies done, done_thinking, finished;
     {
-        hungry = false; // Explicit set hungry to false
+        pc = rxn1_done_eating;
         done_eating = false;
 
         done = true;
@@ -52,9 +59,12 @@ module Philosopher {
 
     // Triggered by done_thinking
     procedure rxn2()
-        modifies done_thinking; // trigger, to be reset
+        modifies pc;
+        modifies done, done_thinking; // trigger, to be reset
         modifies hungry;
     {
+        pc = rxn2_done_thinking;
+        done = false;
         done_thinking = false;
 
         hungry = true;
@@ -62,8 +72,12 @@ module Philosopher {
 
     // Triggered by eat
     procedure rxn3()
-        modifies times_eaten, times_denied, done_eating;
+        modifies pc;
+        modifies hungry, times_eaten, times_denied, done_eating;
     {
+        pc = rxn3_eat;
+        hungry = false; // Explicit set hungry to false
+
         times_eaten = times_eaten + 1;
         times_denied = 0;
 
@@ -72,14 +86,17 @@ module Philosopher {
 
     // Triggered by denied
     procedure rxn4()
+        modifies pc;
         modifies times_denied, done_thinking;
     {
+        pc = rxn4_denied;
         times_denied = times_denied + 1;
 
         done_thinking = true;
     }
 
     init {
+        pc = null2;
         times_eaten = 0;
         times_denied = 0;
         done_eating = false;
@@ -90,37 +107,37 @@ module Philosopher {
         case
             (start) : {
                 call () = rxn0();
-                // havoc start;
-                // assume(start == false);
-            }
-            (done_eating) : {
-                call () = rxn1();
-                /*
-                havoc done_eating;
-                assume(done_eating == false);
-                */
-            }
-            (done_thinking) : {
-                call () = rxn2();
-                /*
-                havoc done_thinking;
-                assume(done_thinking == false);
-                */
             }
             (eat) : {
                 call () = rxn3();
-                /*
-                havoc eat;
-                assume(eat == false);
-                */
+            }
+            (done_eating) : {
+                call () = rxn1();
+            }
+            (done_thinking) : {
+                call () = rxn2();
             }
             (denied) : {
                 call () = rxn4();
-                /*
-                havoc denied;
-                assume(denied == false);
-                */
             }
         esac
+
+        /*
+        if (start) {
+            call () = rxn0();
+        }
+        if (done_eating) {
+            call () = rxn1();
+        }
+        if (done_thinking) {
+            call () = rxn2();
+        }
+        if (eat) {
+            call () = rxn3();
+        }
+        if (denied) {
+            call () = rxn4();
+        }
+        */
     }
 }
