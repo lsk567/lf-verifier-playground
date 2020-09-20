@@ -51,9 +51,9 @@ module main {
         // Constructor
         _instance : (1),
         count : (5),
-        eating_time : (2),
-        thinking_time : (2),
-        starvation_threshold : (10),
+        eating_time : (1),
+        thinking_time : (1),
+        starvation_threshold : (5),
         // Input
         start : (a.philosopher_start[0bv1]),
         eat : (a.eat[0bv1]),
@@ -67,9 +67,9 @@ module main {
         // Constructor
         _instance : (2),
         count : (5),
-        eating_time : (2),
-        thinking_time : (2),
-        starvation_threshold : (10),
+        eating_time : (1),
+        thinking_time : (1),
+        starvation_threshold : (5),
         // Input
         start : (a.philosopher_start[1bv1]),
         eat : (a.eat[1bv1]),
@@ -127,14 +127,26 @@ module main {
         step' = step + 1;
     }
 
-    // invariant deadlock : (a.forks[0bv1] != a.forks[1bv1]); 
-    invariant no_deadlock : (a.forks[0bv1] == a.forks[1bv1]); 
+    //// Deadlock-free property
+    // invariant deadlock_free : (a.forks[0bv1] == a.forks[1bv1]); 
+
+    //// Fairness property 
+    // invariant no_starvation : (!p0.starving && !p1.starving);
+
+    //// LTL properties
     // property[LTL] _step : !F(step == 1); // For debugging
     // property[LTL] deadlock_ltl : !F(a.forks[0bv1] != a.forks[1bv1]);
 
+    // Work in progress: helper invariant tuning
+    invariant no_one_starving : (!p0.starving && !p1.starving);
+    invariant one_eat_at_a_time : !(a.eat[0bv1] && a.eat[1bv1]);
+    invariant times_denied_ge_0 : (p0.times_denied >= 0 && p1.times_denied >= 0);
+    invariant forks_bound : forall (b : bv1) :: a.forks[b] >= -1 && a.forks[b] <= 1;
+
     control {
-        v = induction;
-        // v = bmc(10);
+        v = induction(1);
+        // v = induction(5); // k-induction
+        // v = bmc(20);
         check;
         print_results;
         v.print_cex(
@@ -168,11 +180,13 @@ module main {
             p0.done,
             p0.times_eaten,
             p0.times_denied,
+            p0.starving,
             p0.done_eating,
             p0.done_thinking,
             p0.delay_thinking,
             p0.eating_time,
             p0.thinking_time,
+            p0.starvation_threshold,
             // P1
             p1.pc,
             p1.start,
@@ -184,11 +198,13 @@ module main {
             p1.done,
             p1.times_eaten,
             p1.times_denied,
+            p1.starving,
             p1.done_eating,
             p1.done_thinking,
             p1.delay_thinking,
             p1.eating_time,
-            p1.thinking_time
+            p1.thinking_time,
+            p1.starvation_threshold
         );
     }
 }

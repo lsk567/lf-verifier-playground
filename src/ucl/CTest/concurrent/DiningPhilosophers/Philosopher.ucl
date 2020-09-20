@@ -27,6 +27,7 @@ module Philosopher {
 
     var times_eaten : integer;
     var times_denied: integer;
+    var starving : boolean;
 
     // Logical actions
     var done_eating : boolean;
@@ -110,11 +111,15 @@ module Philosopher {
     procedure rxn4()
         modifies pc;
         modifies delay_thinking;
-        modifies times_denied, done_thinking;
+        modifies times_denied, done_thinking, starving;
     {
         pc = rxn4_denied;
         delay_thinking = thinking_time;
         times_denied = times_denied + 1;
+
+        if (times_denied > starvation_threshold) {
+            starving = true;
+        }
 
         done_thinking = true;
     }
@@ -128,6 +133,7 @@ module Philosopher {
         done_thinking = false;
         delay_eating = eating_time;
         delay_thinking = thinking_time;
+        starving = false;
     }
 
     next {
