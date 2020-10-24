@@ -87,7 +87,7 @@ module main {
     property[LTL] seven_is_unsafe : !F(sum == 7);
 
     control {
-        v = bmc(7);
+        v = bmc(5);
         check;
         print_results;
         v.print_cex(

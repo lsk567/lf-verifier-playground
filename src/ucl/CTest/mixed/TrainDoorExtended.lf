@@ -1,0 +1,93 @@
+target UCLID {
+    bmc: 20
+};
+
+reactor Controller {
+    output outA:int;
+    output outB:int;
+    physical action external:int;
+    reaction(startup) -> external {=
+        // ... Set up sensing
+        
+        // This line of code simulates a button press
+        // external->value is assumed to be 1
+        // schedule(external, 0)
+        outQ = pushQ(outQ, {t+0, Controller, Controller, Controller_external, 1, true});
+    =}
+    reaction(external) -> outA, outB {=
+        // SET(lock, 1)
+        outQ = pushQ(outQ, {t+0, Controller, RelayA, RelayA__in, 1, true});
+        // SET(move, 1)
+        outQ = pushQ(outQ, {t+0, Controller, RelayB, RelayB__in, 1, true});
+    =}
+}
+
+reactor RelayA {
+    state s:int(0);
+    input _in:int;
+    output out:int;
+    reaction(_in) -> out {=
+        s = s + 1;
+        #observe
+        s = s + 2;
+        #observe
+        s = s + 3;
+        #observe
+        
+        // SET(out, 0)
+        outQ = pushQ(outQ, {t+0, RelayA, Door, Door_lock, 1, true});
+    =}
+}
+
+reactor RelayB {
+    state s:int(0);
+    input _in:int;
+    output out:int;
+    reaction(_in) -> out {=
+        s = s + 5;
+        #observe
+        s = s + 7;
+        #observe
+        s = s + 9;
+        #observe
+        
+        // SET(move, 0)
+        outQ = pushQ(outQ, {t+0, RelayB, Train, Train_move, 1, true});
+    =}
+}
+
+reactor Train {
+    input move:int;
+    state moving:int;
+    reaction(move) {=
+        // ... Actuate to move or stop
+        moving = move._5;
+    =}
+}
+
+reactor Door {
+    input lock:int;
+    state locked:int;
+    reaction(lock) {=
+        // ... Actuate to lock or unlock door
+        locked = lock._5;
+    =}
+}
+
+main reactor System {
+    controller 	= new Controller();
+    a 			= new RelayA();
+    b 			= new RelayB();
+    door 		= new Door();
+    train 		= new Train();
+    
+    controller.outA -> a._in;
+    controller.outB -> b._in;
+    a.out			-> door.lock;
+    b.out			-> train.move;
+    
+    preamble {=
+        property unlocked_while_moving : !F(door.locked == 0 && train.moving == 1);
+        concurrent property relay_sum_not_22 : !F(a.s + b.s == 22);
+    =}
+}

@@ -1,5 +1,13 @@
 /**
  * A helper module for common types and constants
+ *
+ * Use tuple instead of record for easy instantiation,
+ * the event_t tuple is defined as [from_reactor_id,
+ * to_reactor_id, time_of_release, trigger_id, token]
+ *
+ * Note: if type overload is enabled, the token_t field
+ * can be reduced to 1 field. Otherwise, multiple token_t
+ * fields are needed depending on the LF program.
  */
 module Common {
     // FILE_SPECIFIC
@@ -10,17 +18,6 @@ module Common {
     // COMMON
     type instant_t    = integer;
     type is_present_t = boolean;
-
-    /**
-     * Use tuple instead of record for easy instantiation,
-     * the event_t tuple is defined as [from_reactor_id,
-     * to_reactor_id, time_of_release, trigger_id, token]
-     *
-     * Note: if type overload is enabled, the token_t field
-     * can be reduced to 1 field. Otherwise, multiple token_t
-     * fields are needed depending on the LF program.
-     */
-    // Note: instant_t and is_present, redundant?
     type event_t = {
                      instant_t,     // Tag
                      reactor_id_t,  // From
@@ -30,9 +27,6 @@ module Common {
                      is_present_t   // Is_present
                    };
 
-    /*
-    // TODO: replace concrete __null__ instantiation with abstract const.
-    const null_event : event_t;
-    axiom (forall (e : event_t) :: null_event._1 > e._1);
-    */
+    define is_present(e : event_t) : boolean
+    = (e != { -1, NULL, NULL, NULL_NULL, -1, false });
 }

@@ -1,0 +1,90 @@
+/*
+ * 0. Analyze specification to see which reactors are involved
+ * 1. Parse each target block by line.
+ * 2. Replace macros (e.g. set))
+ * 3. Carve out observation blocks
+ * 4. Analyze topology graph to find out concurrent blocks 
+ * 5. Insert verification statements to corresponding models
+ */
+
+target UCLID {
+    steps: 10
+};
+
+reactor A {
+    state s:int(0);
+    output outB:int;
+    output outC:int;
+    
+    //@pre 
+    //@post 
+    reaction(startup) -> outB, outC 
+    {=
+        s = s + 1;
+        set(outB, s);
+        
+        s = s + 1;
+        set(outC, s);
+    =}
+}
+
+reactor B {
+    state s:int(0);
+    input _in:int;
+    output out:int;
+    
+    reaction(_in) -> out {=
+    	s = _in + 1;
+    	s = s + 1;
+    	#observe
+    	s = s + 1;
+    	#observe
+    	set(out, s);
+    =}
+}
+
+reactor C {
+    state s:int(0);
+    input _in:int;
+    output out:int;
+    
+    reaction(_in) -> out {=
+    	s = _in + 1;
+    	s = s + 1;
+    	#observe
+    	s = s + 1;
+    	#observe
+    	set(out, s);
+    =}
+}
+
+reactor D {
+    state s:int(0);
+    input _inB:int;
+    input _inC:int;
+    
+    reaction(_inB, _inC) {=
+        s = _inB + _inC;
+    =}
+}
+
+main reactor Composite {
+    a = new A();
+    b = new B();
+    c = new C();
+    d = new D();
+    
+    a.outB -> b._in;
+    a.outC -> c._in;
+    b.out -> d._inB;
+    c.out -> d._inC;
+            
+    // TODO: the following will be checked by default.
+    // deadline
+    // schedule
+    // rate
+    preamble {=
+        property test: a.s != 10;
+        concurrent property not_both_one: b.s == 1 && c.s == 1;
+    =}
+}

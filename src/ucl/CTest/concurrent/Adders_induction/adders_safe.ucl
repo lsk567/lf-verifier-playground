@@ -2,8 +2,6 @@
  * Verify concurrent executions of reactors via induction.
  */
 module Reactor_Sink {
-    define * = Common.*;
-   
     // Program counter
     type pc_t = enum {
         start,

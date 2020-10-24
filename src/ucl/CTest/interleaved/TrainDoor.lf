@@ -1,4 +1,6 @@
-target UCLID;
+target UCLID {
+    bmc: 15
+};
 
 reactor Controller {
     output lock:int;
@@ -13,8 +15,11 @@ reactor Controller {
         outQ = pushQ(outQ, {t+0, Controller, Controller, Controller_external, 1, true});
     =}
     reaction(external) -> lock, move {=
-        outQ = pushQ(outQ, {t+0, Controller, Door, Door_lock, 1, true});   // SET(lock, 0)
-        outQ = pushQ(outQ, {t+0, Controller, Train, Train_move, 1, true}); // SET(move, 0)
+        // Setting the lock output port to 1
+        outQ = pushQ(outQ, {t+0, Controller, Door, Door_lock, 1, true});   // SET(lock, 1)
+        
+        // Setting the lock output port to 1
+        outQ = pushQ(outQ, {t+0, Controller, Train, Train_move, 1, true}); // SET(move, 1)
     =}
 }
 
@@ -45,6 +50,6 @@ main reactor System {
     controller.move -> train.move;
     
     preamble {=
-        property[LTL] unlocked_while_moving : !F(door.locked == 0 && train.moving == 1);
+        property unlocked_while_moving : !F(door.locked == 0 && train.moving == 1);
     =}
 }
