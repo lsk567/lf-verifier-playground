@@ -490,45 +490,47 @@ module main {
         next(b);
     }
 
-    property[LTL] test : !F(uclid_step == 1);
+    // property[LTL] test : !F(uclid_step == 1);
+	// property[LTL] trace_for_all_stop : !F(a.stopped && b.stopped && rti.stopped);
+	property[LTL] rti_stop_while_b_doesnt_stop : !F((!a.stopped || !b.stopped) && rti.stopped);
+	property[LTL] rti_is_the_last_to_stop : G((a.stopped && b.stopped) ==> F(rti.stopped));
+	// property[LTL] a_doesnt_execute_beyond_stop_time_granted : G((a.rti_msg._1 == STOP_GRANTED || a.rti_msg._1 == TIME_ADVANCE_GRANT) ==> (a.timestamp < a.target_timestamp || (a.timestamp == a.target_timestamp && a.microstep <= a.target_microstep)));
 
     control {
-        v = bmc(20);
+        v = bmc(15);
         check;
         print_results;
         v.print_cex(
 			a._in,
-			a.microstep,
-			a.next_microstep,
-			a.next_timestamp,
 			a.out, 
 			a.rti_msg,
 			a.stopped,
-			a.target_microstep, 
-			a.target_timestamp,
 			a.timestamp,
-			b._in, 
-			b.microstep,
-			b.next_microstep,
-			b.next_timestamp,
+			a.microstep,
+			a.next_timestamp,
+			a.next_microstep,
+			a.target_timestamp,
+			a.target_microstep, 
+			b._in,
 			b.out, 
-			b.rti_msg, 
-			b.stopped, 
-			b.target_microstep,
-			b.target_timestamp,
+			b.rti_msg,
+			b.stopped,
 			b.timestamp,
+			b.microstep,
+			b.next_timestamp,
+			b.next_microstep,
+			b.target_timestamp,
+			b.target_microstep, 
 			rti.LOGICAL_TIME_COMPLETE_tags, 
 			rti.NEXT_MESSAGE_tags, 
-			rti.NULL_tag, 
-			rti.NULL_tags, 
 			rti.STOP_ACK_tags, 
 			rti._inA, 
 			rti._inB, 
+			rti.timestamp,
 			rti.microstep,
 			rti.outA, 
 			rti.outB, 
 			rti.stopped,
-			rti.timestamp,
 			uclid_step
 		);
     }
