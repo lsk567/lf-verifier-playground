@@ -15,22 +15,42 @@ module common {
     };
 
     type fed_msg_t = {
-        // request
-        fed_req_t,
-
-        // payloads
+        fed_req_t,              // requests
         integer,                // logical time
         integer                 // microsteps
     };
 
     type rti_msg_t = {
-        // request
-        rti_req_t,
-
-        // payloads
+        rti_req_t,              // requests
         integer,                // logical time
         integer                 // microsteps
     };
+
+    type tag_t = {
+        integer,
+        integer
+    };
+
+    define is_later(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1._1 > t2._1 || (t1._1 == t2._1 && t1._2 > t2._2)) then true else false;
+
+    define is_earlier(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1._1 < 0) then false else (if (t2._1 < 0) then true else (if (t1._1 < t2._1 || (t1._1 == t2._1 && t1._2 < t2._2)) then true else false));
+
+    define is_simultaneous(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1 == t2) then true else false;
+
+    // Application specific
+    type tags_t = { tag_t, tag_t };
+    const NUM_FEDS : integer = 2;
+
+    define get(tags : tags_t, i : integer) : tag_t
+        = if (i == 1) then tags._1 else
+            (if (i == 2) then tags._2 else { -1, 0 });
+
+    define is_full(tags : tags_t) : boolean
+        = (tags._1 != { -1, 0 })
+            && (tags._2 != { -1, 0 });
 }
 
 module federate {
@@ -46,9 +66,10 @@ module federate {
     // A boolean that indicates whether the federate is shut down
     var stopped     : boolean;
 
-    // Upcoming logical time tag in the event queue
+    // Current logical time
     var timestamp   : integer;
     var microstep   : integer;
+    // The logical time of the next event
     var next_timestamp : integer;
     var next_microstep : integer;
 
@@ -58,7 +79,7 @@ module federate {
 
     // Peek the next event in the event queue
     // and update next_timestamp and next_microstep
-    procedure peek_eventq()
+    procedure peek_updated_eventq()
         modifies next_timestamp, next_microstep;
     {
         assume(next_timestamp >= old(next_timestamp));
@@ -88,9 +109,15 @@ module federate {
             fed_msg: fed_msg_t
         )
         modifies timestamp, microstep;
+		modifies next_timestamp, next_microstep;
+		modifies target_timestamp, target_microstep;
     {
         // A local nondeterministic "request" variable
         var req : fed_req_t;
+
+		// Update target time
+		target_timestamp = rti_msg._2;
+		target_microstep = rti_msg._3;
 
         // Process events up to the target time tag
         if (next_timestamp < target_timestamp
@@ -101,6 +128,9 @@ module federate {
 
             // The federate can execute a reaction that calls stop() 
             assume(req == NULL_FED || req == STOP_FROM_FED);
+			
+			// Update next_timestamp and next_microstep	
+            call () = peek_updated_eventq();
         }
         // If the next time tag exceeds the time granted by the RTI,
         // pause and send NEXT_MESSAGE request
@@ -122,10 +152,16 @@ module federate {
             fed_msg: fed_msg_t
         )
         modifies timestamp, microstep;
+		modifies next_timestamp, next_microstep;
+		modifies target_timestamp, target_microstep;
         modifies stopped;
     {
         // A local nondeterministic "request" variable
         var req : fed_req_t;
+
+		// Update target time
+		target_timestamp = rti_msg._2;
+		target_microstep = rti_msg._3;
 
         // Process events up to the target time tag
         if (next_timestamp < target_timestamp
@@ -136,6 +172,9 @@ module federate {
 
             // The federate can execute a reaction that calls stop() 
             assume(req == NULL_FED || req == STOP_FROM_FED);
+
+			// Update next_timestamp and next_microstep	
+            call () = peek_updated_eventq();
         }
         // If the next time tag exceeds the time granted by the RTI,
         // pause and send LOGICAL_TIME_COMPLETE request
@@ -151,12 +190,47 @@ module federate {
         };
     }
 
+	procedure handle_event()
+		returns (
+			fed_msg: fed_msg_t
+		)
+		modifies timestamp, microstep;
+		modifies next_timestamp, next_microstep;
+	{
+        // A local nondeterministic "request" variable
+        var req : fed_req_t;
+
+        // Process events up to the target time tag
+        if (timestamp == next_timestamp
+			&& next_microstep >= microstep) {
+            timestamp = next_timestamp;
+            microstep = next_microstep;
+
+            // The federate can execute a reaction that calls stop() 
+            assume(req == NULL_FED || req == STOP_FROM_FED);
+			
+			// Update next_timestamp and next_microstep	
+			call () = peek_updated_eventq();		
+        }
+        // If the next time tag exceeds the time granted by the RTI,
+        // pause and send LOGICAL_TIME_COMPLETE request
+        else {
+            req = NEXT_MESSAGE;
+        }
+
+        fed_msg = {
+            req,
+            next_timestamp,
+            next_microstep
+        };
+	}
+
     init {
         stopped = false;
         timestamp = 0;
         microstep = 0;
-        next_timestamp = 0;
-        next_microstep = 0;
+        assume(next_timestamp >= 0);
+        assume(next_microstep >= 0);
         target_timestamp = 0;
         target_microstep = 0;
         rti_msg = { NULL_RTI, 0, 0 };
@@ -176,20 +250,24 @@ module federate {
             }
             (rti_msg._1 == TIME_ADVANCE_GRANT) : {
                 call (out') = handle_TIME_ADVANCE_GRANT();
-                call () = peek_eventq();
             }
             (rti_msg._1 == STOP_GRANTED) : {
                 call (out') = handle_STOP_GRANTED();
-                call () = peek_eventq();
             }
             // FIXME: by default, RTI should be able to 
-            // execute up to a logical time step
+            // execute up to a logical time step.
+            // Output NULL messages if it has not finished a step.
+			default : {
+				call (out') = handle_event();
+			}
         esac
     }
 }
 
 module RTI {
-    type * = common.*;
+    type    * = common.*;
+    define  * = common.*;
+    const   * = common.*;
 
     // Input/Output
     input  _inA      : fed_msg_t;
@@ -197,22 +275,263 @@ module RTI {
     output outA      : rti_msg_t;
     output outB      : rti_msg_t;
 
+    // Logical time payload
+    var timestamp   : integer;
+    var microstep   : integer;
+
+    // Buffers
+    var STOP_ACK_tags : tags_t;
+    var NEXT_MESSAGE_tags : tags_t;
+    var LOGICAL_TIME_COMPLETE_tags : tags_t;
+
+    // Indicate whether the RTI has shut down
+    var stopped     : boolean;
+
+    var NULL_tag    : tag_t;
+    var NULL_tags   : tags_t;
+
+    // Helper function for broadcasting messages
     procedure broadcast(msg : rti_msg_t)
-        modifies outA, outB
+        modifies outA, outB;
     {
         outA = msg;
         outB = msg;
     }
-    
-    procedure handle_STOP_FROM_FED
+
+    // Helper procedures
+    procedure max(tags : tags_t)
         returns (
-            rti_msg: rti_msg_t
+            max_tag : tag_t
         )
     {
+        var _max : tag_t;
+        _max = { 0, 0 };
+        for (i : integer) in range(1, NUM_FEDS) {
+            if (is_later(get(tags, i), _max)) {
+                _max = get(tags, i);
+            }
+        }
+        max_tag = _max;
+    }
+    
+    procedure min(tags : tags_t)
+        returns (
+            min_tag : tag_t
+        )
+    {
+        var _min : tag_t; 
+        _min = { -1, 0 }; // -1 is interpreted as infinitely large in is_earlier().
+        for (i : integer) in range(1, NUM_FEDS) {
+            if (is_earlier(get(tags, i), _min)) {
+                _min = get(tags, i);
+            }
+        }
+        min_tag = _min;
+    }
+
+    // Message handlers
+    procedure handle_STOP_FROM_FED()
+		modifies outA, outB;
+    {
+        var rti_msg : rti_msg_t;
+
         rti_msg = {
             STOP_FROM_RTI,
-            next_timestamp,
-            next_microstep
+            -1,
+            -1
         };
+
+        call () = broadcast(rti_msg);
+    }
+
+    procedure handle_all_STOP_ACK()
+        modifies outA, outB;
+        modifies STOP_ACK_tags;
+    {
+        var rti_msg : rti_msg_t;
+        var max_tag : tag_t;
+        
+        call (max_tag) = max(STOP_ACK_tags);
+        rti_msg = {
+            STOP_GRANTED,
+            max_tag._1,
+            max_tag._2
+        };
+
+        call () = broadcast(rti_msg);
+        STOP_ACK_tags = NULL_tags;
+    }
+
+    procedure handle_all_NEXT_MESSAGE()
+        modifies outA, outB;
+        modifies NEXT_MESSAGE_tags;
+    {
+        var rti_msg : rti_msg_t;
+        var min_tag : tag_t;
+
+        call (min_tag) = max(NEXT_MESSAGE_tags);
+        rti_msg = {
+            TIME_ADVANCE_GRANT,
+            min_tag._1,
+            min_tag._2
+        };
+
+        call () = broadcast(rti_msg);
+        NEXT_MESSAGE_tags = NULL_tags;
+    }
+
+    procedure handle_all_LOGICAL_TIME_COMPLETE()
+        modifies outA, outB;
+        modifies stopped;
+        modifies LOGICAL_TIME_COMPLETE_tags;
+    {
+        var rti_msg : rti_msg_t;
+
+        // TODO: comparison
+
+        stopped = true;
+        LOGICAL_TIME_COMPLETE_tags = NULL_tags;
+    }
+
+    procedure run_RTI()
+        modifies outA, outB;
+        modifies stopped;
+        modifies STOP_ACK_tags, LOGICAL_TIME_COMPLETE_tags, NEXT_MESSAGE_tags; 
+    {
+        // Loading inputs
+        if (_inA._1 == STOP_ACK) {
+            STOP_ACK_tags._1 = { _inA._2, _inA._3 };
+        }
+        if (_inB._1 == STOP_ACK) {
+            STOP_ACK_tags._2 = { _inB._2, _inB._3 };
+        }
+        if (_inA._1 == LOGICAL_TIME_COMPLETE) {
+            LOGICAL_TIME_COMPLETE_tags._1 = { _inA._2, _inA._3 };
+        }
+        if (_inB._1 == LOGICAL_TIME_COMPLETE) {
+            LOGICAL_TIME_COMPLETE_tags._2 = { _inB._2, _inB._3 };
+        }
+        if (_inA._1 == NEXT_MESSAGE) {
+            NEXT_MESSAGE_tags._1 = { _inA._2, _inA._3 };
+        }
+        if (_inB._1 == NEXT_MESSAGE) {
+            NEXT_MESSAGE_tags._2 = { _inB._2, _inB._3 };
+        }
+
+        // RTI actions 
+        case
+            // FIXME: enable nondeterminism between simultaneous STOP requests
+            (_inA._1 == STOP_FROM_FED) : {
+                call () = handle_STOP_FROM_FED();
+            }
+            (_inB._1 == STOP_FROM_FED) : {
+                call () = handle_STOP_FROM_FED();
+            }
+            (is_full(STOP_ACK_tags)) : {
+                call () = handle_all_STOP_ACK(); 
+            }
+            (is_full(NEXT_MESSAGE_tags)) : {
+                call () = handle_all_NEXT_MESSAGE();
+            }
+            (is_full(LOGICAL_TIME_COMPLETE_tags)) : {
+                call () = handle_all_LOGICAL_TIME_COMPLETE();
+            }
+        esac
+    }
+
+    init {
+        NULL_tag = { -1, 0 };
+        NULL_tags = { NULL_tag, NULL_tag };
+        outA = { NULL_RTI, -1, 0 };
+        outB = { NULL_RTI, -1, 0 };
+        timestamp = 0;
+        microstep = 0;
+        STOP_ACK_tags = NULL_tags;
+        NEXT_MESSAGE_tags = NULL_tags;
+        LOGICAL_TIME_COMPLETE_tags = NULL_tags;
+        stopped = false;
+    }
+
+    next {
+        // Run RTI
+        call () = run_RTI();
     }
 }
+
+module main {
+    type * = common.*; 
+
+    // Message channels
+    var RTI_to_A : rti_msg_t;
+    var RTI_to_B : rti_msg_t;
+    var A_to_RTI : fed_msg_t;
+    var B_to_RTI : fed_msg_t;
+
+    var uclid_step : integer;
+
+    instance rti : RTI(_inA:(A_to_RTI), _inB:(B_to_RTI), outA:(RTI_to_A), outB:(RTI_to_B));
+    instance a   : federate(_in:(RTI_to_A), out:(A_to_RTI));
+    instance b   : federate(_in:(RTI_to_B), out:(B_to_RTI));
+
+    init {
+        RTI_to_A = { NULL_RTI, -1, 0 };
+        RTI_to_B = { NULL_RTI, -1, 0 };
+        A_to_RTI = { NULL_FED, -1, 0 };
+        B_to_RTI = { NULL_FED, -1, 0 };
+
+        uclid_step = 0;
+    }
+
+    next {
+        uclid_step' = uclid_step + 1;
+
+        next(rti);
+        next(a);
+        next(b);
+    }
+
+    property[LTL] test : !F(uclid_step == 1);
+
+    control {
+        v = bmc(20);
+        check;
+        print_results;
+        v.print_cex(
+			a._in,
+			a.microstep,
+			a.next_microstep,
+			a.next_timestamp,
+			a.out, 
+			a.rti_msg,
+			a.stopped,
+			a.target_microstep, 
+			a.target_timestamp,
+			a.timestamp,
+			b._in, 
+			b.microstep,
+			b.next_microstep,
+			b.next_timestamp,
+			b.out, 
+			b.rti_msg, 
+			b.stopped, 
+			b.target_microstep,
+			b.target_timestamp,
+			b.timestamp,
+			rti.LOGICAL_TIME_COMPLETE_tags, 
+			rti.NEXT_MESSAGE_tags, 
+			rti.NULL_tag, 
+			rti.NULL_tags, 
+			rti.STOP_ACK_tags, 
+			rti._inA, 
+			rti._inB, 
+			rti.microstep,
+			rti.outA, 
+			rti.outB, 
+			rti.stopped,
+			rti.timestamp,
+			uclid_step
+		);
+    }
+}
+
+
