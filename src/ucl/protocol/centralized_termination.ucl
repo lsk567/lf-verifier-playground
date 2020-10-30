@@ -1,0 +1,218 @@
+module common {
+    type fed_req_t = enum { 
+        STOP_FROM_FED,          // send when stop() is called by reactions
+        STOP_ACK,               // acknowledge and send timestamp when receiving STOP
+        LOGICAL_TIME_COMPLETE,  // advance logical time and send this when receiving STOP_GRANTED
+        NEXT_MESSAGE,           // send when completing a step
+        NULL_FED
+    };
+
+    type rti_req_t = enum { 
+        STOP_FROM_RTI,          // broadcast when one federate sends STOP to RTI
+        STOP_GRANTED,           // broadcast when RTI receives STOP_ACK from all federates
+        TIME_ADVANCE_GRANT,     // broadcast when RTI receives NEXT_MESSAGE from all federates
+        NULL_RTI
+    };
+
+    type fed_msg_t = {
+        // request
+        fed_req_t,
+
+        // payloads
+        integer,                // logical time
+        integer                 // microsteps
+    };
+
+    type rti_msg_t = {
+        // request
+        rti_req_t,
+
+        // payloads
+        integer,                // logical time
+        integer                 // microsteps
+    };
+}
+
+module federate {
+    type * = common.*;
+
+    // Input/Output
+    input  _in      : rti_msg_t;
+    output out      : fed_msg_t;
+
+    // Use a variable to make RTI message persistent
+    var rti_msg     : rti_msg_t;
+
+    // A boolean that indicates whether the federate is shut down
+    var stopped     : boolean;
+
+    // Upcoming logical time tag in the event queue
+    var timestamp   : integer;
+    var microstep   : integer;
+    var next_timestamp : integer;
+    var next_microstep : integer;
+
+    // Target logical time tag received from the RTI
+    var target_timestamp : integer;
+    var target_microstep : integer;
+
+    // Peek the next event in the event queue
+    // and update next_timestamp and next_microstep
+    procedure peek_eventq()
+        modifies next_timestamp, next_microstep;
+    {
+        assume(next_timestamp >= old(next_timestamp));
+        havoc next_microstep;
+        if (next_timestamp == old(next_timestamp)) {
+            assume(next_microstep >= old(next_microstep));
+        }
+    }
+
+    // Request handlers
+    procedure handle_STOP_FROM_RTI()
+        returns (
+            fed_msg: fed_msg_t
+        )
+    {
+        fed_msg = {
+            STOP_ACK,
+            next_timestamp,
+            next_microstep
+        };
+    }
+
+    // 1. handle up to logical time target (target_time)
+    // 2. federate can keep sending stop requests
+    procedure handle_TIME_ADVANCE_GRANT()
+        returns (
+            fed_msg: fed_msg_t
+        )
+        modifies timestamp, microstep;
+    {
+        // A local nondeterministic "request" variable
+        var req : fed_req_t;
+
+        // Process events up to the target time tag
+        if (next_timestamp < target_timestamp
+            || (next_timestamp == target_timestamp
+                && next_microstep <= target_microstep)) {
+            timestamp = next_timestamp;
+            microstep = next_microstep;
+
+            // The federate can execute a reaction that calls stop() 
+            assume(req == NULL_FED || req == STOP_FROM_FED);
+        }
+        // If the next time tag exceeds the time granted by the RTI,
+        // pause and send NEXT_MESSAGE request
+        else {
+            req = NEXT_MESSAGE;
+        }
+
+        fed_msg = {
+            req,
+            timestamp,
+            microstep
+        };
+    }
+     
+    // 1. handle up to logical time target (target_time)
+    // 2. federate can keep sending stop requests
+    procedure handle_STOP_GRANTED()
+        returns (
+            fed_msg: fed_msg_t
+        )
+        modifies timestamp, microstep;
+        modifies stopped;
+    {
+        // A local nondeterministic "request" variable
+        var req : fed_req_t;
+
+        // Process events up to the target time tag
+        if (next_timestamp < target_timestamp
+            || (next_timestamp == target_timestamp
+                && next_microstep <= target_microstep)) {
+            timestamp = next_timestamp;
+            microstep = next_microstep;
+
+            // The federate can execute a reaction that calls stop() 
+            assume(req == NULL_FED || req == STOP_FROM_FED);
+        }
+        // If the next time tag exceeds the time granted by the RTI,
+        // pause and send LOGICAL_TIME_COMPLETE request
+        else {
+            req = LOGICAL_TIME_COMPLETE;
+            stopped = true;
+        }
+
+        fed_msg = {
+            req,
+            timestamp,
+            microstep
+        };
+    }
+
+    init {
+        stopped = false;
+        timestamp = 0;
+        microstep = 0;
+        next_timestamp = 0;
+        next_microstep = 0;
+        target_timestamp = 0;
+        target_microstep = 0;
+        rti_msg = { NULL_RTI, 0, 0 };
+    }
+
+    next {
+        // Load message from RTI
+        if (_in._1 != NULL_RTI) {
+            rti_msg' = _in;
+        }
+
+        // Federate actions
+        case 
+            // Responding to RTI messages
+            (rti_msg._1 == STOP_FROM_RTI) : {
+                call (out') = handle_STOP_FROM_RTI();
+            }
+            (rti_msg._1 == TIME_ADVANCE_GRANT) : {
+                call (out') = handle_TIME_ADVANCE_GRANT();
+                call () = peek_eventq();
+            }
+            (rti_msg._1 == STOP_GRANTED) : {
+                call (out') = handle_STOP_GRANTED();
+                call () = peek_eventq();
+            }
+            // FIXME: by default, RTI should be able to 
+            // execute up to a logical time step
+        esac
+    }
+}
+
+module RTI {
+    type * = common.*;
+
+    // Input/Output
+    input  _inA      : fed_msg_t;
+    input  _inB      : fed_msg_t;
+    output outA      : rti_msg_t;
+    output outB      : rti_msg_t;
+
+    procedure broadcast(msg : rti_msg_t)
+        modifies outA, outB
+    {
+        outA = msg;
+        outB = msg;
+    }
+    
+    procedure handle_STOP_FROM_FED
+        returns (
+            rti_msg: rti_msg_t
+        )
+    {
+        rti_msg = {
+            STOP_FROM_RTI,
+            next_timestamp,
+            next_microstep
+        };
+    }
+}
