@@ -69,6 +69,7 @@ module federate {
     // Current logical time
     var timestamp   : integer;
     var microstep   : integer;
+
     // The logical time of the next event
     var next_timestamp : integer;
     var next_microstep : integer;
@@ -145,7 +146,7 @@ module federate {
         };
     }
      
-    // 1. handle up to logical time target (target_time)
+    // 1. handle up to logical time target
     // 2. federate can keep sending stop requests
     procedure handle_STOP_GRANTED()
         returns (
@@ -484,7 +485,8 @@ module main {
 
     next {
         uclid_step' = uclid_step + 1;
-
+		
+		// TODO: Nondeterministic choice
         next(rti);
         next(a);
         next(b);
@@ -492,9 +494,15 @@ module main {
 
     // property[LTL] test : !F(uclid_step == 1);
 	// property[LTL] trace_for_all_stop : !F(a.stopped && b.stopped && rti.stopped);
-	property[LTL] rti_stop_while_b_doesnt_stop : !F((!a.stopped || !b.stopped) && rti.stopped);
+
+	// TODO: use invariant and k-induction to prove the property below.
+	property[LTL] rti_stop_while_a_b_dont_stop : !F((!a.stopped || !b.stopped) && rti.stopped);
 	property[LTL] rti_is_the_last_to_stop : G((a.stopped && b.stopped) ==> F(rti.stopped));
-	// property[LTL] a_doesnt_execute_beyond_stop_time_granted : G((a.rti_msg._1 == STOP_GRANTED || a.rti_msg._1 == TIME_ADVANCE_GRANT) ==> (a.timestamp < a.target_timestamp || (a.timestamp == a.target_timestamp && a.microstep <= a.target_microstep)));
+
+	// TODO: if a.stopped and b.stopped, does rti stop within k steps.
+
+	// TODO: every federate eventually receives a stop grant with TS > current logical time.
+	// Make a buggy federate.
 
     control {
         v = bmc(15);
