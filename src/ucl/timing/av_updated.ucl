@@ -1,0 +1,213 @@
+module common {
+
+    type data_t = integer; // Measure the distance to the closest object
+    const danger_threshold : integer = 3;
+}
+
+module Clock {
+
+    output t_prev : integer; // In milliseconds
+    output incr : integer;
+    assume(t_prev > 0);
+    assume(incr > 0);
+
+    next {
+        havoc incr;
+        t_prev' = t_prev + incr;
+    }
+}
+
+module Lidar {
+    
+    type * = common.*;
+    const * = common.*;
+
+    input t_prev : integer;
+    input incr : integer;
+
+    output data : data_t;
+    output data_is_new : boolean;
+
+    const data_rate : integer = 50; // 20hz, 50ms
+
+    var danger_start_time : integer;
+
+    init {
+        data_is_new = false;
+        data = 999;
+        danger_start_time = -1;
+    }
+
+    next {
+        case
+            (incr > data_rate) : {
+                data_is_new' = true;
+                havoc data;
+                assume(data' > 0);
+
+                if (data' <= danger_threshold && danger_start_time == -1) {
+                    danger_start_time' = t_prev + incr;
+                }
+            }
+            default : {
+                data_is_new' = false;
+            }
+        esac
+    }
+}
+
+module VisionSystem {
+
+    type * = common.*;
+    const * = common.*;
+
+    input t_prev : integer;
+    input incr : integer;
+
+    input data : data_t;
+    input data_is_new : boolean;
+
+    output danger : boolean;
+    
+    const nn_exec_bound : integer = 100; // 100ms
+    var lidar_data : data_t;
+    var data_saved : boolean;
+
+    init {
+        danger = false;
+        data_saved = false;
+    }
+
+    next {
+        case
+            (data_is_new && !data_saved) : {
+                lidar_data' = data;
+                data_saved' = true;
+            }
+            (data_saved && incr > nn_exec_bound) : {
+                // Process data using neural network
+                if (lidar_data <= danger_threshold) {
+                    danger' = true;
+                }
+                else {
+                    danger' = false;
+                }
+                
+                data_saved' = false;
+            }
+        esac
+    }
+}
+
+module Controller {
+
+    type * = common.*;
+    const * = common.*;
+
+    input t_prev : integer;
+    input incr : integer;
+    input danger : boolean;
+    input lidar_data : data_t;
+
+    output break : boolean;
+    
+    const ctrl_exec_bound : integer = 10; // 10ms
+    
+    var signal_received : boolean;
+    var danger_signal : boolean;
+    var lidar_data_received : boolean;
+    var lidar_data_saved : data_t;
+
+    var break_time : integer;
+
+    procedure process() 
+        modifies danger_signal, signal_received, lidar_data_saved, lidar_data_received, break, break_time;
+    {
+        if ((signal_received || (lidar_data_received && lidar_data_saved < danger_threshold)) && incr > ctrl_exec_bound) {
+            if (danger || lidar_data_saved <= danger_threshold) {
+                break = true;
+                if (break_time == -1) {
+                    break_time = t_prev + incr;
+                }
+            }
+            else {
+                break = false;
+            }
+            signal_received = false;
+            lidar_data_received = false;
+        }
+        if (!signal_received && danger) {
+            danger_signal = danger;
+            signal_received = true;
+        }
+        if (!lidar_data_received) {
+            lidar_data_saved = lidar_data;
+            lidar_data_received = true;
+        }
+    }
+
+    init {
+        signal_received = false;
+        lidar_data_received = false;
+        lidar_data_saved = 999;
+        break = false;
+        break_time = -1;
+    }
+
+    next {
+        call () = process();
+    }
+}
+
+module main {
+
+    type * = common.*;
+    const * = common.*;
+    
+    var t_prev : integer;
+    var incr : integer;
+    var data : data_t;
+    var data_is_new : boolean;
+    var danger : boolean;
+    var break : boolean;
+
+    instance clock : Clock(t_prev : (t_prev), incr : (incr));
+    instance lidar : Lidar(t_prev : (t_prev), incr : (incr), data : (data), data_is_new : (data_is_new));
+    instance vision : VisionSystem(t_prev : (t_prev), incr : (incr), data : (data), data_is_new : (data_is_new), danger : (danger));
+    instance controller : Controller(t_prev : (t_prev), incr : (incr), danger : (danger), break : (break), lidar_data : (data));
+
+    next {
+        next(clock);
+        next(lidar);
+        next(vision);
+        next(controller);
+    }
+
+    // We want to see if the system can apply break within the requirement (in ms)
+    const break_safety_requirement : integer = 20;
+    property[LTL] break_in_time : G(!((lidar.data <= danger_threshold
+                                    && controller.break_time != -1
+                                    && lidar.danger_start_time != -1)
+            && (controller.break_time - lidar.danger_start_time <= break_safety_requirement)));
+
+    control {
+        v = bmc(10);
+        check;
+        print_results;
+        v.print_cex(
+            clock.t_prev,
+            clock.incr,
+            lidar.data,
+            lidar.data_is_new,
+            vision.lidar_data,
+            vision.danger,
+            controller.break,
+            lidar.danger_start_time,
+            controller.break_time,
+            // controller.signal_received,
+            // vision.data_saved
+            controller.lidar_data_received,
+            controller.lidar_data_saved
+        );
+    }
+}
