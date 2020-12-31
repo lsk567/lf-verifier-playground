@@ -1,0 +1,107 @@
+target C {
+    threads: 1,
+    keepalive: true
+};
+
+reactor Controller {
+    
+    preamble {=
+        // Read input characters until an EOF is received.
+        // Each time a newline is received, schedule a response
+        // action.
+        
+        struct arg_struct {
+            void* _response;
+        };
+        
+        void print_msg() {
+        	printf("Press \"d\" to open/close the door.\n");
+        }
+        
+        void* read_input(void* args) {
+            char c;
+            while(1) {
+                c = getchar();
+                if (c != '\n') {
+                    if (c == 'd') {
+                        schedule(((struct arg_struct*) args)->_response, 0);
+                    } 
+                    else {
+                        printf("Unknown key: %c\n", c);
+                        print_msg();
+                    }
+	                if (c == EOF) {
+	                    request_stop();
+	                    break;
+	                }
+                }
+            }
+            return NULL;
+        }
+    =}
+    
+    output out:bool;
+    state door:bool(true);
+    state useVision:bool(true);
+    physical action response;
+    
+    reaction(startup) -> response {=        
+        pthread_t thread_id;
+        
+        struct arg_struct *args = malloc(sizeof *args);
+        args->_response = response;
+        
+        pthread_create(&thread_id, NULL, &read_input, (void*)args);
+        print_msg();
+    =}
+    
+    reaction(response) -> out {=
+    	self->door = !self->door;
+        SET(out, self->door);
+    =}
+}
+
+reactor Vision {
+    
+    input _in:bool;
+    output out:bool;
+    
+    reaction(_in) -> out {=
+        SET(out, _in->value);
+    =}
+}
+
+reactor Door {
+    
+    input inVision:bool;
+    input inController:bool;
+    state danger:bool(false);
+    
+    reaction(inVision) {=        
+        self->danger = false;
+    =}
+    
+    reaction(inController) {=
+        if (!self->danger) {
+	        bool cmd = inController->value;
+	        if (cmd) {
+	            printf("Door is set to open at %lld nsec.\n", get_logical_time());
+	        } else {
+	            printf("Door is set to close at %lld nsec.\n", get_logical_time());
+	        }        
+        } else {
+            printf("Abort due to danger!\n");
+        }
+    =}
+}
+
+main reactor AircraftDoor {
+    
+    controller	= new Controller();
+    vision		= new Vision();
+    door		= new Door();
+    
+    controller.out			-> vision._in;
+    vision.out				-> door.inVision;
+    controller.out			-> door.inController after 100 msec;
+}

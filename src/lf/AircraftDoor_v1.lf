@@ -1,0 +1,86 @@
+target C {
+    threads: 1,
+    keepalive: true
+};
+
+reactor Controller {
+    
+    preamble {=
+        // Read input characters until an EOF is received.
+        // Each time a newline is received, schedule a response
+        // action.
+        
+        void print_msg() {
+        	printf("Press \"d\" to open/close the door.\n");
+        }
+        
+        void* read_input(void* response) {
+            int c;
+            while(1) {
+                c = getchar();
+                if (c != '\n') {
+                    if (c == 'd') {
+                    	schedule(response, 0);
+                    }
+                    else {
+                        printf("Unknown key: %c\n", c);
+                        print_msg();
+                    }
+	                if (c == EOF) {
+	                    request_stop();
+	                    break;
+	                }
+                }
+            }
+            return NULL;
+        }
+    =}
+    
+    output out:bool;
+    state request_time:time(0);
+    state door:bool(true);
+    physical action response;
+    
+    reaction(startup) -> response {=        
+        pthread_t thread_id;
+        pthread_create(&thread_id, NULL, &read_input, response);
+        print_msg();
+    =}
+    
+    reaction(response) -> out {=
+    	self->door = !self->door;
+        SET(out, self->door);
+    =} 
+}
+
+reactor Vision {
+    
+    input _in:bool;
+    output out:bool;
+    
+    reaction(_in) -> out {=
+        SET(out, _in->value);
+    =}
+}
+
+reactor Door {
+    
+    input _in:bool;
+    
+    reaction(_in) {=
+        if (_in->value) {
+            printf("Door is set to open at %lld nsec.\n", get_logical_time());
+        } else {
+            printf("Door is set to close at %lld nsec.\n", get_logical_time());
+        }
+    =}
+}
+
+main reactor AircraftDoor {
+    
+    controller	= new Controller();
+    vision		= new Vision();
+    door		= new Door();
+    controller.out -> vision._in;
+    vision.out -> door._in;
+}
