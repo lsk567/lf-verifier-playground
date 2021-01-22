@@ -12,14 +12,14 @@ reactor Controller {
         // This line of code simulates a button press
         // external->value is assumed to be 1
         // schedule(external, 0)
-        outQ = pushQ(outQ, {t+0, Controller, Controller, Controller_external, 1, true});
+        outQ = pushQ(outQ, {t+0, Controller_controller, Controller_controller, Controller_external, 1, true});
     =}
     reaction(external) -> lock, move {=
         // Setting the lock output port to 1
-        outQ = pushQ(outQ, {t+0, Controller, Door, Door_lock, 1, true});   // SET(lock, 1)
+        outQ = pushQ(outQ, {t+0, Controller_controller, Door_door, Door_lock, 1, true});   // SET(lock, 1)
         
         // Setting the lock output port to 1
-        outQ = pushQ(outQ, {t+0, Controller, Train, Train_move, 1, true}); // SET(move, 1)
+        outQ = pushQ(outQ, {t+0, Controller_controller, Train_train, Train_move, 1, true}); // SET(move, 1)
     =}
 }
 

@@ -66,11 +66,14 @@ reactor Vision {
 reactor Door {
     
     input _in:bool;
+    state status:bool;
     
     reaction(_in) {=
         if (_in->value) {
+            self->status = _in->value;
             printf("Door is set to open at %lld nsec.\n", get_logical_time());
         } else {
+            self->status = _in->value;
             printf("Door is set to close at %lld nsec.\n", get_logical_time());
         }
     =}

@@ -1,23 +1,58 @@
 target C;
 
 reactor A {
-	output _out:int;
-	reaction(startup) -> _out {=
-		SET(_out, 1);
+    input  _in:int;
+	output out:int;
+	
+	reaction(startup, _in) -> out {=
+		SET(out, 1);
 	=}
 }
 
 reactor B {
-	input _in:int;
+	input  _in:int;
+	output out:int;
 	state s:int(0);
-	reaction(_in) {=
+	
+	logical action send_to_a(1 sec);
+	physical action act;
+    
+    reaction(_in) {=
 		self->s = self->s + _in->value;
 		printf("%d\n", self->s);
+		
+		// schedule(send_to_a, 0);
 	=}
+	
+	reaction(send_to_a) -> out {=
+        SET(out, self->s); 
+    =}
+}
+
+reactor Delay {
+    input _in:int;
+    output out:int;
+    state s:int;
+    logical action delay;
+    
+    reaction(delay) -> out {=
+        SET(out, self->s);
+    =}
+    
+    reaction(_in) -> delay {=
+        self->s = _in->value;
+        schedule(delay, MSEC(1));
+    =}
 }
 
 main reactor Composition {
 	a = new A();
 	b = new B();
-	a._out -> b._in;
+	delay = new Delay();
+	
+	a.out -> b._in;
+	b.out -> delay._in;
+	delay.out -> a._in;
+	// b.out -> a._in after 1 msec;
 } 
+

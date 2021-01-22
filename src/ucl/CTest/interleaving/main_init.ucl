@@ -1,0 +1,35 @@
+module M {
+    var arr : [integer]integer;
+    var v : integer;
+
+    init {
+        // arr[0] = 1;
+        arr = arr[0 -> 1];
+    }
+}
+
+module main {
+    instance a : M();
+    instance b : M();
+
+    // invariant not_zero : a.arr[0] != 0;
+    invariant not_zero : a.v != 0;
+
+    init {
+        // Main cannot modify a and b's internal states.
+        // a.arr = a.arr[0 -> 1];
+        // a.v = 0;
+    }
+
+    next {
+        next(a);
+        next(b);
+    }
+
+    control {
+        v = unroll(5);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}

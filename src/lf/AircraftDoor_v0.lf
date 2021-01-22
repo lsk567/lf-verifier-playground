@@ -1,0 +1,50 @@
+target C {
+    threads: 1,
+    keepalive: true
+};
+
+reactor Controller {
+    
+    output out:bool;
+    state door:bool(true);
+    
+    reaction(startup) -> out {=        
+        self->door = !self->door;
+        SET(out, self->door);
+    =}
+}
+
+reactor Vision {
+    
+    input _in:bool;
+    output out:bool;
+    
+    reaction(_in) -> out {=
+        SET(out, _in->value);
+    =}
+}
+
+reactor Door {
+    
+    input _in:bool;
+    state status:bool;
+    
+    reaction(_in) {=
+        if (_in->value) {
+            self->status = _in->value;
+            printf("Door is set to open at %lld nsec.\n", get_logical_time());
+        } else {
+            self->status = _in->value;
+            printf("Door is set to close at %lld nsec.\n", get_logical_time());
+        }
+    =}
+}
+
+main reactor AircraftDoor {
+    
+    controller	= new Controller();
+    vision		= new Vision();
+    door		= new Door();
+    controller.out -> vision._in;
+    vision.out -> door._in;
+}

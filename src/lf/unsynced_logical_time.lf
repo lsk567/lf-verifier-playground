@@ -1,0 +1,36 @@
+target C {
+    coordination: centralized
+};
+
+reactor A {
+    
+    output out:int;
+    timer t(0, 2 msec);
+    
+    reaction(t) -> out {=
+        SET(out, 1);
+        printf("A1: %lld ns\n", get_logical_time());
+    =} 
+}
+
+reactor B {
+    
+    input _in:int;
+    timer t(0, 5 msec);
+    
+    reaction(t) {=
+        // Do something
+        printf("B1: %lld ns\n", get_logical_time());
+    =}
+    
+    reaction(_in) {=
+        // Do something
+        printf("B2: %lld ns\n", get_logical_time());
+    =}
+}
+
+federated reactor Distributed at localhost {
+    a = new A();
+    b = new B();
+    a.out -> b._in after 10 msec;
+}

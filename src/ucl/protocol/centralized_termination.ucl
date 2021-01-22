@@ -235,6 +235,7 @@ module federate {
         target_timestamp = 0;
         target_microstep = 0;
         rti_msg = { NULL_RTI, 0, 0 };
+        assume(_in == { NULL_RTI, -1, 0 });
     }
 
     next {
@@ -451,6 +452,8 @@ module RTI {
         NEXT_MESSAGE_tags = NULL_tags;
         LOGICAL_TIME_COMPLETE_tags = NULL_tags;
         stopped = false;
+        assume(_inA == { NULL_FED, -1, 0 });
+        assume(_inB == { NULL_FED, -1, 0 });
     }
 
     next {
@@ -461,6 +464,10 @@ module RTI {
 
 module main {
     type * = common.*; 
+
+    // Nondeterministic asynchronous composition
+    var nondet_choice : integer;
+    assume(nondet_choice >= 0 && nondet_choice < 3);
 
     // Message channels
     var RTI_to_A : rti_msg_t;
@@ -487,17 +494,31 @@ module main {
         uclid_step' = uclid_step + 1;
 		
 		// TODO: Nondeterministic choice
-        next(rti);
-        next(a);
-        next(b);
+        havoc nondet_choice;
+        
+        case
+            (nondet_choice == 0) : {
+                next(rti);
+            }
+            (nondet_choice == 1) : {
+                next(a);
+            }
+            (nondet_choice == 2) : {
+                next(b);
+            }
+        esac
     }
 
     // property[LTL] test : !F(uclid_step == 1);
-	// property[LTL] trace_for_all_stop : !F(a.stopped && b.stopped && rti.stopped);
+	property[LTL] trace_for_all_stop : !F(a.stopped && b.stopped && rti.stopped);
 
 	// TODO: use invariant and k-induction to prove the property below.
-	property[LTL] rti_stop_while_a_b_dont_stop : !F((!a.stopped || !b.stopped) && rti.stopped);
-	property[LTL] rti_is_the_last_to_stop : G((a.stopped && b.stopped) ==> F(rti.stopped));
+	// property[LTL] rti_stop_while_a_b_dont_stop : !F((!a.stopped || !b.stopped) && rti.stopped);
+	// property[LTL] rti_is_the_last_to_stop : G((a.stopped && b.stopped) ==> F(rti.stopped));
+
+    // TODO: proof by k-induction
+	// invariant rti_stop_while_a_b_dont_stop : !((!a.stopped || !b.stopped) && rti.stopped);
+	// invariant rti_is_the_last_to_stop : G((a.stopped && b.stopped) ==> F(rti.stopped));
 
 	// TODO: if a.stopped and b.stopped, does rti stop within k steps.
 
@@ -506,6 +527,12 @@ module main {
 
     control {
         v = bmc(15);
+
+        // Proof by k-induction.
+        // TODO: 1. how to choose k?
+        //       2. UCLID cex generation for k-induction lacks 1 step?
+        // v = induction(4);
+        
         check;
         print_results;
         v.print_cex(
@@ -539,7 +566,8 @@ module main {
 			rti.outA, 
 			rti.outB, 
 			rti.stopped,
-			uclid_step
+			uclid_step,
+            nondet_choice
 		);
     }
 }
