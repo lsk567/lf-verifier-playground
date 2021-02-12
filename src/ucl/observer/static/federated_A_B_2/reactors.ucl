@@ -1,0 +1,181 @@
+/**
+ *  Reactor A has a timer with a period 3 and a reaction sensitive to it.
+ */
+module reactor_A {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+
+    type * = EventQ.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var yield : boolean;
+
+    // Output
+    output out : msg_t;
+
+    // Timer
+    const period : interval_t = 3;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_A1()
+        returns ( ret : msg_t )
+    {
+        ret = { b_B1, tag_delay(clock, a_out_b_in_DELAY) };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+    }
+
+    next {
+        next(event_q);
+        yield' = false;
+        if (! yield) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == a_A1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                    call (out') = rxn_A1();
+                }
+                default : {
+                    out' = { NULL, clock };
+                }
+            esac
+
+            // Push next event
+            eq_in' = { a_A1, tag_schedule(clock, period) };
+        }
+
+    }
+}
+
+module reactor_B {
+    // Imports
+    // type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    type * = EventQ.*;
+
+    // Logical clock
+    var clock : tag_t;
+
+    // Input
+    input _in : msg_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_B1()
+        returns ( ret : msg_t )
+    {
+        ret = { NULL, clock };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+    }
+
+    next {
+        // Trigger reaction & generate output
+        case
+            (N(eq_out) == b_B1) : {
+                invocation' = eq_out;
+                clock' = g(eq_out);
+                // call (out') = rxn_B1();
+            }
+            default : {
+                // out' = { NULL, clock };
+            }
+        esac
+
+        // Check input and push next event
+        case
+            (N(_in) == b_B1) : {
+                eq_in' = _in;
+            }
+            default : {
+                eq_in' = { NULL, clock };
+            }
+        esac
+    }
+}
+
+module main {
+    // Imports
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var A_to_B : msg_t;
+    var __NULL : msg_t;
+
+    var a_b4_b : boolean;
+    var diff : interval_t;
+
+    instance a : reactor_A(out : (A_to_B));
+    instance b : reactor_B(_in : (A_to_B));
+
+    init {
+        __NULL = { NULL, {0,0} };
+        A_to_B = __NULL;
+        a_b4_b = invoke_before(a.invocation, b.invocation);
+    }
+
+    next {
+        next(a);
+        next(b);
+        a_b4_b' = invoke_before(a.invocation, b.invocation);
+        diff' = tag_diff(g(b.invocation), g(a.invocation));
+    }
+
+    property[LTL] B_always_NULL : G( invoke_before(a.invocation, b.invocation) );
+
+    control {
+        v = bmc(5);
+        check;
+        print_results;
+        v.print_cex(
+            a.clock,
+            a.invocation,
+            a.out,
+            a.yield,
+            a.eq_in,
+            a.eq_out,
+            a.event_q.contents,
+            a.event_q._in,
+            a.event_q.out,
+            b.clock,
+            b.invocation,
+            b._in,
+            b.eq_in,
+            b.eq_out,
+            b.event_q.contents,
+            b.event_q._in,
+            b.event_q.out,
+            a_b4_b,
+            diff
+        );
+    }
+}

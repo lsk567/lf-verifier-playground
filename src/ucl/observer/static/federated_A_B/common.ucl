@@ -1,0 +1,97 @@
+module common {
+    /**
+     * Time tag-related types and macros
+     */
+    type timestamp_t = integer;
+    type interval_t  = integer;
+    type tag_t = {
+        timestamp_t,
+        interval_t
+    };
+
+    // Projection macros
+    define pi1(t : tag_t) : timestamp_t = t._1;
+    define pi2(t : tag_t) : interval_t = t._2;
+
+    // Tag comparison
+    define tag_later(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1._1 > t2._1 || (t1._1 == t2._1 && t1._2 > t2._2)) then true else false;
+
+    define tag_earlier(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1._1 < 0) then false else (if (t2._1 < 0) then true else (if (t1._1 < t2._1 || (t1._1 == t2._1 && t1._2 < t2._2)) then true else false));
+
+    define tag_same(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1 == t2) then true else false;
+
+    // Tag operation
+    define tag_schedule(t : tag_t, i : interval_t) : tag_t
+        = if (i < 0) then t else (if (i == 0) then { pi1(t), pi2(t) + 1 } else { pi1(t) + i, 0 });
+
+    define tag_delay(t : tag_t, i : interval_t) : tag_t
+        = { pi1(t) + i, pi2(t) };
+
+    // FIXME: only concerns timestamp for now. Need to factor in microsteps in the future.
+    define tag_diff(t1, t2: tag_t) : interval_t
+        = pi1(t1) - pi1(t2);
+
+
+    /**
+     * Reaction graph + Topology graph
+     * FIXME: perhaps there are more efficient encodings.
+     */
+    type rxn_id_t = enum { NULL, a_A1, b_B1 }; // Application specific
+    
+    // Precedence in reaction graph
+    define rxn_precede(r1, r2 : rxn_id_t) : boolean
+    = if (r1 == a_A1 && r2 == b_B1) then true else false;
+
+    // Reachability in topology graph
+    define rxn_reach(r1, r2 : rxn_id_t) : boolean
+    = if (r1 == a_A1 && r2 == b_B1) then true else false;
+
+    // Logical delays
+    const a_out_b_in_DELAY : interval_t = 10;
+
+    /**
+     * Reaction invocation
+     */
+    type invocation_t = { rxn_id_t, tag_t };
+
+    // Projection macros
+    define N(i : invocation_t) : rxn_id_t = i._1;
+    define g(i : invocation_t) : tag_t = i._2;
+
+    // Defining "invoked before"
+    /*
+    define invoke_before(_i : interval_t, i1, i2 : invocation_t) : boolean
+    = if (_i == 0) 
+        then (if (tag_same(g(i1), g(i2))
+                    && rxn_precede(N(i1), N(i2)))
+                then true 
+                else false)
+        else (if (_i > 0) 
+                then (if (tag_diff(g(i1), g(i2)) >= _i 
+                        && rxn_reach(N(i1), N(i2)))
+                        then true
+                        else false)
+                else false);
+    */
+
+    define invoke_before(i1, i2 : invocation_t) : boolean
+    = if (tag_same(g(i1), g(i2))
+            && rxn_precede(N(i1), N(i2)))
+        then true 
+        else (if (tag_diff(g(i2), g(i1)) > 0 
+                && rxn_reach(N(i1), N(i2)))
+                then true
+                else false);
+
+    /**
+     * Message type
+     */
+    // msg_t should have a trigger and an arrival tag, which turns out to be
+    // the same as invocation_t. In this model, the source reactor generates
+    // an invocation, which the sink reactor can directly map on its timeline.
+    type msg_t = invocation_t;
+
+}

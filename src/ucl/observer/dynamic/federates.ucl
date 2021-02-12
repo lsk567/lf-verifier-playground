@@ -1,0 +1,25 @@
+module federate_A {
+    type * = common.*;
+
+    // Input/Output
+    input  _in      : rti_msg_t;
+    output out      : fed_msg_t;
+
+    // Use a variable to make RTI message persistent
+    var rti_msg     : rti_msg_t;
+
+    // Current logical time
+    var timestamp   : integer;
+    var microstep   : integer;
+
+    // The logical time of the next event
+    var next_timestamp : integer;
+    var next_microstep : integer;
+
+    // Target logical time tag received from the RTI
+    var target_timestamp : integer;
+    var target_microstep : integer;
+
+
+
+}

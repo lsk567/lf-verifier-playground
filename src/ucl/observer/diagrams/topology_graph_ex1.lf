@@ -1,0 +1,73 @@
+target C;
+
+reactor A {
+    
+    input in1:int;
+    input in2:int;
+    output out1:int;
+    output out2:int;
+    
+    reaction(startup, in1) -> out1 {=
+        
+    =}
+    
+    reaction(startup, in2) -> out2 {=
+        
+    =}
+}
+
+reactor B {
+    
+    input  in1:int;
+    input  in2:int;
+    output out1:int;
+    output out2:int;
+    
+    reaction(in1) -> out1 {=
+        
+    =}
+    
+    reaction(in2) -> out2 {=
+        
+    =}
+}
+
+reactor C {
+    
+    input in1:int;
+    input in2:int;
+    output out1:int;
+    output out2:int;
+    
+    logical action a;
+    logical action b(1 msec);
+    
+    reaction(in1) -> a {=
+        
+    =}
+    
+    reaction(a) -> b {=
+        
+    =}
+    
+    reaction(b) -> out1 {=
+        
+    =}
+    
+    reaction(in2) -> out2 {=
+        
+    =}
+}
+
+main reactor Topology {
+    a = new A();
+    b = new B();
+    c = new C();
+        
+    a.out2 -> b.in2 after 10 msec;
+    a.out1 -> b.in1 after 10 msec;
+    b.out2 -> c.in2;
+    b.out1 -> c.in1;
+    c.out2 -> a.in2;
+    c.out1 -> a.in1;
+}

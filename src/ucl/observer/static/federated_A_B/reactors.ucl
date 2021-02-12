@@ -1,0 +1,114 @@
+/**
+ *  Reactor A has a timer with a period 3 and a reaction sensitive to it.
+ */
+module reactor_A {
+    // Imports
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var yield : boolean;
+
+    // Output
+    output out : msg_t;
+
+    // Timer
+    const period : interval_t = 3;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+    }
+
+    next {
+        havoc yield;
+        if (! yield) {
+            out' = { b_B1, tag_delay(clock, a_out_b_in_DELAY) };
+            clock' = tag_schedule(clock, period);
+            invocation' = { a_A1, clock' };
+        }
+    }
+}
+
+module reactor_B {
+    // Imports
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    // Logical clock
+    var clock : tag_t;
+
+    // Input
+    input _in : msg_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+    }
+
+    next {
+        case
+            (N(_in) == b_B1) : {
+                invocation' = _in;
+            }
+        esac
+        clock' = g(invocation'); 
+    }
+}
+
+module main {
+    // Imports
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var A_to_B : msg_t;
+    var __NULL : msg_t;
+
+    var a_b4_b : boolean;
+    var diff : interval_t;
+
+    instance a : reactor_A(out : (A_to_B));
+    instance b : reactor_B(_in : (A_to_B));
+
+    init {
+        __NULL = { NULL, {0,0} };
+        A_to_B = __NULL;
+        a_b4_b = invoke_before(a.invocation, b.invocation);
+    }
+
+    next {
+        next(a);
+        next(b);
+        a_b4_b' = invoke_before(a.invocation, b.invocation);
+        diff' = tag_diff(g(b.invocation), g(a.invocation));
+    }
+
+    property[LTL] B_always_NULL : G( tag_later(a.clock, {0,0}) ==> invoke_before(a.invocation, b.invocation) );
+
+    control {
+        v = bmc(5);
+        check;
+        print_results;
+        v.print_cex(
+            a.clock,
+            a.invocation,
+            a.out,
+            a.yield,
+            b.clock,
+            b.invocation,
+            b._in,
+            a_b4_b,
+            diff
+        );
+    }
+}
