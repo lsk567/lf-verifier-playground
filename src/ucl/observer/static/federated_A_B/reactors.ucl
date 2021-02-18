@@ -57,8 +57,8 @@ module reactor_B {
 
     next {
         case
-            (N(_in) == b_B1) : {
-                invocation' = _in;
+            (N(_in') == b_B1) : {
+                invocation' = _in';
             }
         esac
         clock' = g(invocation'); 
@@ -93,7 +93,7 @@ module main {
         diff' = tag_diff(g(b.invocation), g(a.invocation));
     }
 
-    property[LTL] B_always_NULL : G( tag_later(a.clock, {0,0}) ==> invoke_before(a.invocation, b.invocation) );
+    property[LTL] prop : G( tag_later(a.clock, {0,0}) ==> invoke_before(a.invocation, b.invocation) );
 
     control {
         v = bmc(5);

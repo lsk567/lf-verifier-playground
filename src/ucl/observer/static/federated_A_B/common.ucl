@@ -4,9 +4,10 @@ module common {
      */
     type timestamp_t = integer;
     type interval_t  = integer;
+    type index_t  = integer;
     type tag_t = {
         timestamp_t,
-        interval_t
+        index_t
     };
 
     // Projection macros
@@ -85,7 +86,6 @@ module common {
                 && rxn_reach(N(i1), N(i2)))
                 then true
                 else false);
-
     /**
      * Message type
      */

@@ -37,6 +37,8 @@ module reactor_A {
     init {
         clock = { 0, 0 };
         invocation = { NULL, clock };
+        eq_in = { NULL, clock };
+        eq_out = { NULL, clock };
     }
 
     next {
@@ -95,6 +97,8 @@ module reactor_B {
     init {
         clock = { 0, 0 };
         invocation = { NULL, clock };
+        eq_in = { NULL, clock };
+        eq_out = { NULL, clock };
     }
 
     next {
@@ -153,7 +157,7 @@ module main {
     property[LTL] B_always_NULL : G( invoke_before(a.invocation, b.invocation) );
 
     control {
-        v = bmc(5);
+        v = bmc(10);
         check;
         print_results;
         v.print_cex(

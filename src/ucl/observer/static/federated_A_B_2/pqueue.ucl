@@ -55,74 +55,54 @@ module EventQ
     var __min__ : data_t; 
 
 
-    procedure pushQ(_contents : queue_t, _data : data_t)
-        returns (
-            contentsP : queue_t,
-            countP : integer
-        )
+    procedure pushQ()
+        modifies contents, count;
         modifies __idx__, __done__;
-        // requires (op == POP);
     {
         __idx__ = 1;
         __done__ = false;
         
         for (i : integer) in range(1, SIZE) {
-            if (get(_contents, i) == NULL_EVENT &&
+            if (get(contents, i) == NULL_EVENT &&
                 !__done__ &&
-                _data != NULL_EVENT)
+                _in != NULL_EVENT)
             {
-                contentsP = set(_contents, i, _data);
-                countP = count + 1;
+                contents = set(contents, i, _in);
+                count = count + 1;
                 __done__ = true;
             }
         }
-
-        if (!__done__) {
-            contentsP = _contents;
-            countP = count;
-        }
     }
 
-    procedure popQ(_contents : queue_t)
-        returns (
-            contentsP : queue_t,
-            countP : integer,
-            outP : data_t
-        )
+    procedure popQ()
+        modifies contents, count, out;
         modifies __min__, __idx__;
-        // requires ( op == PUSH ); // Useful for printing execution traces
     {
         // Be careful not to block all paths,
         // leading to meaningless passes.
         havoc __idx__;
         assume(forall (i : integer) ::
-            get(_contents, i) != NULL_EVENT ==>
-            (tag_earlier(g(get(_contents, __idx__)), g(get(_contents, i)))
-            || tag_same(g(get(_contents, __idx__)), g(get(_contents, i)))));
-        assume(countQ(_contents) > 0 ==> get(_contents, __idx__) != NULL_EVENT);
+            get(contents, i) != NULL_EVENT ==>
+            (tag_earlier(g(get(contents, __idx__)), g(get(contents, i)))
+            || tag_same(g(get(contents, __idx__)), g(get(contents, i)))));
+        assume(countQ(contents) > 0 ==> get(contents, __idx__) != NULL_EVENT);
 
-        outP = get(_contents, __idx__);
-        contentsP = set(_contents, __idx__, NULL_EVENT);
-        if (outP == NULL_EVENT) {
-            countP = count;
+        out = get(contents, __idx__);
+        contents = set(contents, __idx__, NULL_EVENT);
+        if (out == NULL_EVENT) {
+            count = count;
         }
         else {
-            countP = count - 1;
+            count = count - 1;
         }
     }
 
     procedure run()
-        returns (
-            contentsP : queue_t,
-            countP : integer,
-            outP : data_t
-        )
+        modifies contents, count, out;
         modifies __min__, __idx__, __done__;
     {
-        var _contents : queue_t;
-        var _count : count_t;
-        call (_contents, _count) = pushQ(contents, _in);
-        call (contentsP, countP, outP) = popQ(_contents);
+        call () = pushQ();
+        call () = popQ();
     }
 
     init {
@@ -141,7 +121,7 @@ module EventQ
     }
 
     next {
-        call (contents', count', out') = run();
+        call () = run();
     }
 
     control {
