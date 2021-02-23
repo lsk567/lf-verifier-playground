@@ -1,0 +1,304 @@
+/**
+ * FIXME: understand the use of prime variables.
+ */
+module reactor_Controller {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Output
+    output out : msg_t;
+
+    // Timer
+    const period : interval_t = 3;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_Controller_1()
+        returns ( ret : msg_t )
+    {
+        ret = { v_Vision_1, tag_delay(clock, c_out_v_in_DELAY) };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+        // eq_in = { NULL, clock };
+        eq_in = { c_Controller_1, clock };
+        eq_out = { NULL, clock };
+
+        // stutter = false;
+    }
+
+    next {
+        next(event_q);
+        havoc stutter;
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == c_Controller_1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                    call (out') = rxn_Controller_1();
+                }
+                default : {
+                    out' = { NULL, clock };
+                }
+            esac
+
+            // Push next event
+            // eq_in' = { c_Controller_1, tag_schedule(clock, period) };
+            eq_in' = { NULL, clock };
+        }
+
+    }
+}
+
+module reactor_Vision {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Input
+    input _in : msg_t;
+
+    // Output
+    output out : msg_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_Vision_1()
+        returns ( ret : msg_t )
+    {
+        ret = { d_Door_1, tag_delay(clock, v_out_d_in_DELAY) };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+        eq_in = { NULL, clock };
+        eq_out = { NULL, clock };
+
+        // stutter = false;
+    }
+
+    next {
+        next(event_q);
+        havoc stutter;
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == v_Vision_1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                    call (out') = rxn_Vision_1();
+                }
+                default : {
+                    out' = { NULL, clock };
+                }
+            esac
+
+            // Check input and push next event
+            case
+                (N(_in) == v_Vision_1) : {
+                    eq_in' = _in;
+                }
+                default : {
+                    eq_in' = { NULL, clock };
+                }
+            esac
+        }
+    }
+}
+
+module reactor_Door {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Input
+    input _in : msg_t;
+
+    // Output
+    output out : msg_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_Vision_1()
+        returns ( ret : msg_t )
+    {
+        ret = { d_Door_1, tag_delay(clock, v_out_d_in_DELAY) };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+        eq_in = { NULL, clock };
+        eq_out = { NULL, clock };
+
+        // stutter = false;
+    }
+
+    next {
+        next(event_q);
+        havoc stutter;
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == d_Door_1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+
+                    // No output
+                }
+                default : {
+                    // No output
+                }
+            esac
+
+            // Check input and push next event
+            case
+                (N(_in) == d_Door_1) : {
+                    eq_in' = _in;
+                }
+                default : {
+                    eq_in' = { NULL, clock };
+                }
+            esac
+        }
+    }
+}
+
+module main {
+    // Imports
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var c_to_v : msg_t;
+    var v_to_d : msg_t;
+    var __NULL : msg_t;
+
+    instance c : reactor_Controller(out : (c_to_v));
+    instance v : reactor_Vision(_in : (c_to_v), out : (v_to_d));
+    instance d : reactor_Door(_in : (v_to_d));
+
+    var c_b4_v : boolean;
+    var v_b4_d : boolean;
+    var c_b4_d : boolean;
+
+    init {
+        __NULL = { NULL, {0,0} };
+        c_to_v = __NULL;
+        v_to_d = __NULL;
+
+        c_b4_v = invoke_before(0, c.invocation, v.invocation);
+        v_b4_d = invoke_before(0, v.invocation, d.invocation);
+        c_b4_d = invoke_before(0, c.invocation, d.invocation);
+    }
+
+    next {
+        next(c);
+        next(v);
+        next(d);
+
+        c_b4_v' = invoke_before(0, c.invocation, v.invocation);
+        v_b4_d' = invoke_before(0, v.invocation, d.invocation);
+        c_b4_d' = invoke_before(0, c.invocation, d.invocation);
+    }
+
+    // Looking for cex that has v not in between two c and d invocations. 
+    // Should be unsat.
+    /*
+    property[LTL] prop : !F( invoke_before(0, c.invocation, d.invocation)
+                            && !(invoke_before(0, c.invocation, v.invocation) &&
+                                 invoke_before(0, v.invocation, d.invocation))
+                            );
+    */
+
+    // Original property: whenever the Controller is invoked before the Door,
+    // the Vision system is invoked before the Door and is preceded by the
+    // invocation of the Controller.
+    property[LTL] prop : G( invoke_before(0, c.invocation, d.invocation)
+                            ==> (invoke_before(0, c.invocation, v.invocation) &&
+                                 invoke_before(0, v.invocation, d.invocation))
+                            );
+
+    control {
+        _v = bmc(10);
+        check;
+        print_results;
+        // FIXME: print less for readability.
+        _v.print_cex(
+            c.clock,
+            c.stutter,
+            c.invocation,
+            c.out,
+            c.eq_in,
+            c.eq_out,
+            c.event_q.contents,
+            c.event_q._in,
+            c.event_q.out,
+            v.clock,
+            v.stutter,
+            v.invocation,
+            v._in,
+            v.eq_in,
+            v.eq_out,
+            v.event_q.contents,
+            v.event_q._in,
+            v.event_q.out,
+            d.clock,
+            d.stutter,
+            d.invocation,
+            d._in,
+            d.eq_in,
+            d.eq_out,
+            d.event_q.contents,
+            d.event_q._in,
+            d.event_q.out,
+            c_b4_v,
+            v_b4_d,
+            c_b4_d
+        );
+    }
+}
