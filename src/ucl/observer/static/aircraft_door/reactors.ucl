@@ -6,6 +6,7 @@ module reactor_Controller {
     define * = common.*;
     const * = common.*;
     type * = EventQ.*;
+    const * = config.*;
 
     // Logical clock
     var clock : tag_t;
@@ -27,17 +28,17 @@ module reactor_Controller {
     instance event_q : EventQ(_in : (eq_in), out : (eq_out));
 
     // Reactions
-    procedure rxn_Controller_1()
+    procedure rxn_controller_1()
         returns ( ret : msg_t )
     {
-        ret = { v_Vision_1, tag_delay(clock, c_out_v_in_DELAY) };
+        ret = { vision_1, tag_delay(clock, controller_out_vision_in_DELAY) };
     }
 
     init {
         clock = { 0, 0 };
         invocation = { NULL, clock };
         // eq_in = { NULL, clock };
-        eq_in = { c_Controller_1, clock };
+        eq_in = { controller_1, clock };
         eq_out = { NULL, clock };
 
         // stutter = false;
@@ -45,14 +46,16 @@ module reactor_Controller {
 
     next {
         next(event_q);
-        havoc stutter;
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
         if (! stutter) {
             // Trigger reaction & generate output
             case
-                (N(eq_out) == c_Controller_1) : {
+                (N(eq_out) == controller_1) : {
                     invocation' = eq_out;
                     clock' = g(eq_out);
-                    call (out') = rxn_Controller_1();
+                    call (out') = rxn_controller_1();
                 }
                 default : {
                     out' = { NULL, clock };
@@ -60,7 +63,7 @@ module reactor_Controller {
             esac
 
             // Push next event
-            // eq_in' = { c_Controller_1, tag_schedule(clock, period) };
+            // eq_in' = { controller_1, tag_schedule(clock, period) };
             eq_in' = { NULL, clock };
         }
 
@@ -72,6 +75,7 @@ module reactor_Vision {
     define * = common.*;
     const * = common.*;
     type * = EventQ.*;
+    const * = config.*;
 
     // Logical clock
     var clock : tag_t;
@@ -93,10 +97,10 @@ module reactor_Vision {
     instance event_q : EventQ(_in : (eq_in), out : (eq_out));
 
     // Reactions
-    procedure rxn_Vision_1()
+    procedure rxn_vision_1()
         returns ( ret : msg_t )
     {
-        ret = { d_Door_1, tag_delay(clock, v_out_d_in_DELAY) };
+        ret = { door_1, tag_delay(clock, vision_out_door_in_DELAY) };
     }
 
     init {
@@ -110,14 +114,16 @@ module reactor_Vision {
 
     next {
         next(event_q);
-        havoc stutter;
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
         if (! stutter) {
             // Trigger reaction & generate output
             case
-                (N(eq_out) == v_Vision_1) : {
+                (N(eq_out) == vision_1) : {
                     invocation' = eq_out;
                     clock' = g(eq_out);
-                    call (out') = rxn_Vision_1();
+                    call (out') = rxn_vision_1();
                 }
                 default : {
                     out' = { NULL, clock };
@@ -126,7 +132,7 @@ module reactor_Vision {
 
             // Check input and push next event
             case
-                (N(_in) == v_Vision_1) : {
+                (N(_in) == vision_1) : {
                     eq_in' = _in;
                 }
                 default : {
@@ -142,6 +148,7 @@ module reactor_Door {
     define * = common.*;
     const * = common.*;
     type * = EventQ.*;
+    const * = config.*;
 
     // Logical clock
     var clock : tag_t;
@@ -163,10 +170,10 @@ module reactor_Door {
     instance event_q : EventQ(_in : (eq_in), out : (eq_out));
 
     // Reactions
-    procedure rxn_Vision_1()
+    procedure rxn_door_1()
         returns ( ret : msg_t )
     {
-        ret = { d_Door_1, tag_delay(clock, v_out_d_in_DELAY) };
+        // NoOp
     }
 
     init {
@@ -180,11 +187,13 @@ module reactor_Door {
 
     next {
         next(event_q);
-        havoc stutter;
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
         if (! stutter) {
             // Trigger reaction & generate output
             case
-                (N(eq_out) == d_Door_1) : {
+                (N(eq_out) == door_1) : {
                     invocation' = eq_out;
                     clock' = g(eq_out);
 
@@ -197,7 +206,7 @@ module reactor_Door {
 
             // Check input and push next event
             case
-                (N(_in) == d_Door_1) : {
+                (N(_in) == door_1) : {
                     eq_in' = _in;
                 }
                 default : {
@@ -225,6 +234,7 @@ module main {
     var c_b4_v : boolean;
     var v_b4_d : boolean;
     var c_b4_d : boolean;
+    var chrono : boolean;
 
     init {
         __NULL = { NULL, {0,0} };
@@ -234,6 +244,9 @@ module main {
         c_b4_v = invoke_before(0, c.invocation, v.invocation);
         v_b4_d = invoke_before(0, v.invocation, d.invocation);
         c_b4_d = invoke_before(0, c.invocation, d.invocation);
+
+        // chrono = chronological_3(0, v.invocation, d.invocation);
+        chrono = chronological_3(0, c.invocation, v.invocation, d.invocation);
     }
 
     next {
@@ -244,24 +257,31 @@ module main {
         c_b4_v' = invoke_before(0, c.invocation, v.invocation);
         v_b4_d' = invoke_before(0, v.invocation, d.invocation);
         c_b4_d' = invoke_before(0, c.invocation, d.invocation);
+        
+        // chrono' = chronological_3(0, v.invocation, d.invocation);
+        chrono' = chronological_3(0, c.invocation, v.invocation, d.invocation);
+
+        // Is this a bug??
+        // chrono' = chronological_3(0, v.invocation, d.invocation);
     }
 
-    // Looking for cex that has v not in between two c and d invocations. 
-    // Should be unsat.
-    /*
-    property[LTL] prop : !F( invoke_before(0, c.invocation, d.invocation)
-                            && !(invoke_before(0, c.invocation, v.invocation) &&
-                                 invoke_before(0, v.invocation, d.invocation))
-                            );
-    */
 
     // Original property: whenever the Controller is invoked before the Door,
     // the Vision system is invoked before the Door and is preceded by the
     // invocation of the Controller.
-    property[LTL] prop : G( invoke_before(0, c.invocation, d.invocation)
+    /*
+    property[LTL] vision_in_between : G( invoke_before(0, c.invocation, d.invocation)
                             ==> (invoke_before(0, c.invocation, v.invocation) &&
                                  invoke_before(0, v.invocation, d.invocation))
                             );
+    */
+
+    property[LTL] chronological_order : (
+        G((c.invocation != __NULL
+            && v.invocation != __NULL
+            && d.invocation != __NULL)
+            ==> chronological_3(0, c.invocation, v.invocation, d.invocation))
+    );
 
     control {
         _v = bmc(10);
@@ -298,7 +318,8 @@ module main {
             d.event_q.out,
             c_b4_v,
             v_b4_d,
-            c_b4_d
+            c_b4_d,
+            chrono
         );
     }
 }
