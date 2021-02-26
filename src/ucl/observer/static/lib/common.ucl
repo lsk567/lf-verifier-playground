@@ -1,3 +1,8 @@
+/**
+ * This encoding of the observer pattern includes 2 simplifying assumptions.
+ * 1. schedule() calls have additional delays of 0.
+ * 2. Reactions that have declared outputs necessarily produce them.
+ */
 module common {
     type * = app.*;
     define * = app.*;
@@ -63,6 +68,8 @@ module common {
     define g(i : invocation_t) : tag_t = i._2;
 
     // Defining "invoked before"
+    // Assuming a restricted version of Reactors
+    // where schedule() has a 0 additional delay.
     define invoke_before(_i : interval_t, i1, i2 : invocation_t) : boolean
     = if (_i == 0) 
         then (if (tag_same(g(i1), g(i2))
@@ -70,7 +77,7 @@ module common {
                 then true 
                 else false)
         else (if (_i > 0) 
-                then (if (tag_diff(g(i1), g(i2)) >= _i 
+                then (if (tag_diff(g(i1), g(i2)) == _i 
                         && _rxn_reach(N(i1), N(i2)))
                         then true
                         else false)
