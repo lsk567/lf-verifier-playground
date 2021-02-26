@@ -1,0 +1,298 @@
+/**
+ *  Reactor A has a timer with a period 3 and a reaction sensitive to it.
+ */
+module reactor_controller {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+    const * = config.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Output
+    output out1 : msg_t;
+    output out2 : msg_t;
+
+    // Timer
+    const period : interval_t = 3;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_1()
+        returns ( ret1 : msg_t,
+                  ret2 : msg_t )
+    {
+        ret1 = { train_1, tag_delay(clock, controller_out_train_in_DELAY) };
+        ret2 = { door_1, tag_delay(clock, controller_out_door_in_DELAY) };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+        
+        eq_in = { controller_1, clock };
+        eq_out = { NULL, clock };
+
+        stutter = false;
+    }
+
+    next {
+        next(event_q);
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == controller_1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                    call (out1', out2') = rxn_1();
+                }
+                default : {
+                    out1' = { NULL, clock };
+                    out2' = { NULL, clock };
+                }
+            esac
+
+            // Check input and push next event
+            // Or push next timer event
+            case
+                default : {
+                    eq_in' = { NULL, clock };
+                }
+            esac
+        }
+
+    }
+}
+
+module reactor_train {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+    const * = config.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Input
+    input _in : msg_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_1()
+        returns ( ret : msg_t )
+    {
+        ret = { NULL, clock };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+        eq_in = { NULL, clock };
+        eq_out = { NULL, clock };
+        stutter = false;
+    }
+
+    next {
+        next(event_q);
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == train_1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                }
+                default : {
+                }
+            esac
+
+            // Check input and push next event
+            case
+                (N(_in) == train_1) : {
+                    eq_in' = _in;
+                }
+                default : {
+                    eq_in' = { NULL, clock };
+                }
+            esac
+        }
+    }
+}
+
+module reactor_door {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+    const * = config.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Input
+    input _in : msg_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_1()
+        returns ( ret : msg_t )
+    {
+        ret = { NULL, clock };
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+        eq_in = { NULL, clock };
+        eq_out = { NULL, clock };
+        stutter = false;
+    }
+
+    next {
+        next(event_q);
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == door_1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                }
+                default : {
+                }
+            esac
+
+            // Check input and push next event
+            case
+                (N(_in) == door_1) : {
+                    eq_in' = _in;
+                }
+                default : {
+                    eq_in' = { NULL, clock };
+                }
+            esac
+        }
+    }
+}
+
+module main {
+    // Imports
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var controller_to_train : msg_t;
+    var controller_to_door : msg_t;
+    var __NULL : msg_t;
+
+    instance controller : reactor_controller(out1 : (controller_to_train),
+                                             out2 : (controller_to_door));
+    instance train : reactor_train(_in : (controller_to_train));
+    instance door  : reactor_door(_in : (controller_to_door));
+
+    var door_before_train : boolean;
+
+    init {
+        __NULL = { NULL, {0,0} };
+        controller_to_train = __NULL;
+        controller_to_door = __NULL;
+
+        door_before_train = invoke_before(0, train.invocation, door.invocation);
+    }
+
+    next {
+        next(controller);
+        next(train);
+        next(door);
+
+        door_before_train' = invoke_before(0, door.invocation, train.invocation);
+    }
+
+    // Property: from the perspective of all observers, train does not
+    // move before door closes.
+    // Note that "train_before_door =/> door_before_train"
+    // and that "train_door_concurrent <==> !train_before_door && !door_before_train".
+
+    property[LTL] door_always_closes_before_train_moves :
+        G((train.invocation != __NULL && door.invocation != __NULL) 
+            ==> invoke_before(0, train.invocation, door.invocation));
+
+    property[LTL] train_door_are_concurrent :
+        G((train.invocation != __NULL && door.invocation != __NULL) 
+            ==> (!invoke_before(0, train.invocation, door.invocation)
+                    && !invoke_before(0, door.invocation, train.invocation)));
+
+    control {
+        v = bmc(10);
+        check;
+        print_results;
+        v.print_cex(
+            controller.clock,
+            controller.stutter,
+            controller.invocation,
+            controller.out1,
+            controller.out2,
+            controller.eq_in,
+            controller.eq_out,
+            controller.event_q.contents,
+            controller.event_q._in,
+            controller.event_q.out,
+            train.clock,
+            train.stutter,
+            train.invocation,
+            train._in,
+            train.eq_in,
+            train.eq_out,
+            train.event_q.contents,
+            train.event_q._in,
+            train.event_q.out,
+            door.clock,
+            door.stutter,
+            door.invocation,
+            door._in,
+            door.eq_in,
+            door.eq_out,
+            door.event_q.contents,
+            door.event_q._in,
+            door.event_q.out,
+            door_before_train
+        );
+    }
+}

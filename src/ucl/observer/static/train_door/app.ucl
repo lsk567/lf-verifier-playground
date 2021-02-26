@@ -1,0 +1,24 @@
+module config {
+    // FIXME: boolean const is not implemented in UCLID5.
+    const enable_stutter : integer = 1;
+}
+
+// Contains application-specific information.
+module app {
+    // Reaction ID
+    type rxn_id_t = enum { NULL, controller_1, train_1, door_1 };
+
+    // Precedence in reaction graph
+    define rxn_precede(r1, r2 : rxn_id_t) : boolean
+    = if ((r1 == controller_1 && r2 == train_1)
+            || (r1 == controller_1 && r2 == door_1)) then true else false;
+
+    // Reachability in topology graph
+    define rxn_reach(r1, r2 : rxn_id_t) : boolean
+    = if ((r1 == controller_1 && r2 == train_1)
+            || (r1 == controller_1 && r2 == door_1)) then true else false;
+
+    // Logical delays
+    const controller_out_train_in_DELAY : interval_t = 0;
+    const controller_out_door_in_DELAY  : interval_t = 0;
+}
