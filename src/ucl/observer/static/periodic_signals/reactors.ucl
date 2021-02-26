@@ -1,0 +1,227 @@
+/**
+ * FIXME: understand the use of prime variables.
+ */
+module reactor_source {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+    const * = config.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Output
+    output out : msg_t;
+
+    // Timer
+    var period : interval_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_source_1()
+        returns ( ret : msg_t )
+    {
+        ret = { sink_1, tag_delay(clock, source_out_sink_in_DELAY) };
+    }
+
+    init {
+        clock = { 0, 0 };
+        period = 3;
+        invocation = { NULL, clock };
+        eq_in = { source_1, clock };
+        eq_out = { NULL, clock };
+    }
+
+    next {
+        next(event_q);
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == source_1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                    call (out') = rxn_source_1();
+                }
+                default : {
+                    out' = { NULL, clock };
+                }
+            esac
+
+            // Push next event
+            // FIXME: there seems to be a synchronization problem.
+            // eq_in is not updated every step.
+            eq_in' = { source_1, tag_schedule(clock, period) };
+        }
+    }
+}
+
+module reactor_sink {
+    // Imports
+    define * = common.*;
+    const * = common.*;
+    type * = EventQ.*;
+    const * = config.*;
+
+    // Logical clock
+    var clock : tag_t;
+    var stutter : boolean;
+
+    // Input
+    input _in : msg_t;
+
+    // Output
+    output out : msg_t;
+
+    // Current invocation
+    var invocation : invocation_t;
+    var prev_invocation : invocation_t;
+
+    // Event queue
+    var eq_in : data_t;
+    var eq_out : data_t;
+
+    instance event_q : EventQ(_in : (eq_in), out : (eq_out));
+
+    // Reactions
+    procedure rxn_sink_1()
+        returns ( ret : msg_t )
+    {
+        // NoOp
+    }
+
+    init {
+        clock = { 0, 0 };
+        invocation = { NULL, clock };
+        prev_invocation = { NULL, clock };
+        eq_in = { NULL, clock };
+        eq_out = { NULL, clock };
+    }
+
+    next {
+        next(event_q);
+        if (enable_stutter == 1) {
+            havoc stutter;
+        }
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == sink_1) : {
+                    prev_invocation' = invocation;
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+
+                    // No output
+                }
+                default : {
+                    // No output
+                }
+            esac
+
+            // Check input and push next event
+            case
+                (N(_in) == sink_1) : {
+                    eq_in' = _in;
+                }
+                default : {
+                    eq_in' = { NULL, clock };
+                }
+            esac
+        }
+    }
+}
+
+module main {
+    // Imports
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var source_to_sink : msg_t;
+    var __NULL : msg_t;
+
+    instance source : reactor_source(out : (source_to_sink));
+    instance sink : reactor_sink(_in : (source_to_sink));
+
+    var source_b4_sink : boolean;
+
+    var sporadic_var : boolean;
+
+    init {
+        __NULL = { NULL, {0,0} };
+        source_to_sink = __NULL;
+
+        source_b4_sink = invoke_before(0, source.invocation, sink.invocation);
+        sporadic_var = sporadic(pi1(sink.clock), sink.prev_invocation, sink.invocation, source.period);
+    }
+
+    next {
+        next(source);
+        next(sink);
+
+        source_b4_sink' = invoke_before(0, source.invocation, sink.invocation);
+        sporadic_var' = sporadic(pi1(sink.clock), sink.prev_invocation, sink.invocation, source.period);
+    }
+
+    // property[LTL] test : false;
+    
+    property[LTL] periodic_invocation : (
+        G(
+            (sink.prev_invocation != __NULL
+            && sink.invocation != __NULL
+            && sink.prev_invocation != sink.invocation) // to avoid synchronization issue
+                ==> (periodic(pi1(sink.clock), sink.prev_invocation, sink.invocation) == source.period)
+        )
+    );
+
+    property[LTL] sporadic_invocation : (
+        G(
+            (sink.prev_invocation != __NULL
+            && sink.invocation != __NULL
+            && sink.prev_invocation != sink.invocation) // to avoid synchronization issue
+                ==> (sporadic(pi1(sink.clock), sink.prev_invocation, sink.invocation, source.period))
+        )
+    );
+
+    control {
+        _v = bmc(5);
+        check;
+        print_results;
+        // FIXME: print less for reasink.bility.
+        _v.print_cex(
+            source.clock,
+            source.stutter,
+            source.invocation,
+            source.out,
+            source.eq_in,
+            source.eq_out,
+            source.event_q.contents,
+            source.event_q._in,
+            source.event_q.out,
+            sink.clock,
+            sink.stutter,
+            sink.invocation,
+            sink.prev_invocation,
+            sink.out,
+            sink.eq_in,
+            sink.eq_out,
+            sink.event_q.contents,
+            sink.event_q._in,
+            sink.event_q.out,
+            source_b4_sink,
+            sporadic_var
+        );
+    }
+}
