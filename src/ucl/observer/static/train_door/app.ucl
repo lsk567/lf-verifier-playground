@@ -13,9 +13,16 @@ module app {
     = if ((r1 == controller_1 && r2 == train_1)
             || (r1 == controller_1 && r2 == door_1)) then true else false;
 
-    // Reachability in topology graph
+    // Topology graph
+    define rxn_has_edge(r1, r2 : rxn_id_t) : boolean
+    = if ( (r1 == r2)
+            || (r1 == controller_1 && r2 == train_1)
+            || (r1 == controller_1 && r2 == door_1)) then true else false;
+
+    // Reachability derived from the topology graph
     define rxn_reach(r1, r2 : rxn_id_t) : boolean
-    = if ((r1 == controller_1 && r2 == train_1)
+    = if ( (r1 == r2)
+            || (r1 == controller_1 && r2 == train_1)
             || (r1 == controller_1 && r2 == door_1)) then true else false;
 
     // Logical delays
