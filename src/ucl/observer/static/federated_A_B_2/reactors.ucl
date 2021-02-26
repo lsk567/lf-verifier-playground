@@ -10,7 +10,7 @@ module reactor_A {
 
     // Logical clock
     var clock : tag_t;
-    var yield : boolean;
+    var stutter : boolean;
 
     // Output
     output out : msg_t;
@@ -43,8 +43,8 @@ module reactor_A {
 
     next {
         next(event_q);
-        yield' = false;
-        if (! yield) {
+        havoc stutter;
+        if (! stutter) {
             // Trigger reaction & generate output
             case
                 (N(eq_out) == a_A1) : {
@@ -74,6 +74,7 @@ module reactor_B {
 
     // Logical clock
     var clock : tag_t;
+    var stutter : boolean;
 
     // Input
     input _in : msg_t;
@@ -102,27 +103,29 @@ module reactor_B {
     }
 
     next {
-        // Trigger reaction & generate output
-        case
-            (N(eq_out) == b_B1) : {
-                invocation' = eq_out;
-                clock' = g(eq_out);
-                // call (out') = rxn_B1();
-            }
-            default : {
-                // out' = { NULL, clock };
-            }
-        esac
+        next(event_q);
+        havoc stutter;
+        if (! stutter) {
+            // Trigger reaction & generate output
+            case
+                (N(eq_out) == b_B1) : {
+                    invocation' = eq_out;
+                    clock' = g(eq_out);
+                }
+                default : {
+                }
+            esac
 
-        // Check input and push next event
-        case
-            (N(_in) == b_B1) : {
-                eq_in' = _in;
-            }
-            default : {
-                eq_in' = { NULL, clock };
-            }
-        esac
+            // Check input and push next event
+            case
+                (N(_in) == b_B1) : {
+                    eq_in' = _in;
+                }
+                default : {
+                    eq_in' = { NULL, clock };
+                }
+            esac
+        }
     }
 }
 
@@ -154,7 +157,7 @@ module main {
         diff' = tag_diff(g(b.invocation), g(a.invocation));
     }
 
-    property[LTL] B_always_NULL : G( invoke_before(a.invocation, b.invocation) );
+    property[LTL] b_not_hb_a : !F((a.invocation != __NULL && b.invocation != __NULL) ==> invoke_before(b.invocation, a.invocation) );
 
     control {
         v = bmc(10);
@@ -162,15 +165,16 @@ module main {
         print_results;
         v.print_cex(
             a.clock,
+            a.stutter,
             a.invocation,
             a.out,
-            a.yield,
             a.eq_in,
             a.eq_out,
             a.event_q.contents,
             a.event_q._in,
             a.event_q.out,
             b.clock,
+            b.stutter,
             b.invocation,
             b._in,
             b.eq_in,
