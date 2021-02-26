@@ -2,6 +2,15 @@
  * This encoding of the observer pattern includes 2 simplifying assumptions.
  * 1. schedule() calls have additional delays of 0.
  * 2. Reactions that have declared outputs necessarily produce them.
+ *
+ *
+ * FIXME: Bug?? For some reason, i2, i3 cannot be used as params?
+ * If they are used, the predicate is always false.
+ * Possible name collision after translation with the underlying call
+ * of invoke_before. Look into this.
+ *
+ * define chronological_3(_i : interval_t, i2, i3 : invocation_t) : boolean
+ * = (invoke_before(_i, i2, i3));
  */
 module common {
     type * = app.*;
@@ -32,14 +41,14 @@ module common {
     define tag_same(t1 : tag_t, t2 : tag_t) : boolean
         = if (t1 == t2) then true else false;
 
-    // Tag operation
+    // Tag algebra
     define tag_schedule(t : tag_t, i : interval_t) : tag_t
         = if (i < 0) then t else (if (i == 0) then { pi1(t), pi2(t) + 1 } else { pi1(t) + i, 0 });
 
     define tag_delay(t : tag_t, i : interval_t) : tag_t
         = { pi1(t) + i, pi2(t) };
 
-    // FIXME: only concerns timestamp for now. Need to factor in microsteps in the future.
+    // Only consider timestamp for now.
     define tag_diff(t1, t2: tag_t) : interval_t
         = pi1(t1) - pi1(t2);
 
@@ -54,7 +63,11 @@ module common {
     define _rxn_precede(r1, r2 : _rxn_id_t) : boolean
     = rxn_precede(r1, r2);
 
-    // Reachability in topology graph
+    // Topology graph
+    define _rxn_has_edge(r1, r2 : _rxn_id_t) : boolean
+    = rxn_has_edge(r1, r2);
+
+    // Reachability derived from the topology graph
     define _rxn_reach(r1, r2 : _rxn_id_t) : boolean
     = rxn_reach(r1, r2);
 
@@ -67,22 +80,6 @@ module common {
     define N(i : invocation_t) : _rxn_id_t = i._1;
     define g(i : invocation_t) : tag_t = i._2;
 
-    // Defining "invoked before"
-    // Assuming a restricted version of Reactors
-    // where schedule() has a 0 additional delay.
-    define invoke_before(_i : interval_t, i1, i2 : invocation_t) : boolean
-    = if (_i == 0) 
-        then (if (tag_same(g(i1), g(i2))
-                    && _rxn_precede(N(i1), N(i2)))
-                then true 
-                else false)
-        else (if (_i > 0) 
-                then (if (tag_diff(g(i1), g(i2)) == _i 
-                        && _rxn_reach(N(i1), N(i2)))
-                        then true
-                        else false)
-                else false);
-
     /**
      * Message type
      */
@@ -91,5 +88,45 @@ module common {
     // an invocation, which the sink reactor can directly map on its timeline.
     type msg_t = invocation_t;
 
+
+    // Defining "invoke before"
+    // Relies on assumption #2.
+    define invoke_before(_i : interval_t, i1, i2 : invocation_t) : boolean
+    = (_i == 0 
+            ==> (tag_same(g(i1), g(i2))) 
+                && _rxn_precede(N(i1), N(i2)))
+        && (_i > 0 
+            ==> (tag_diff(g(i1), g(i2)) == _i 
+                && _rxn_reach(N(i1), N(i2))));
+
+    define invoke_immediately_before(_i : interval_t, i1, i2 : invocation_t) : boolean
+    = invoke_before(_i, i1, i2) 
+        && _rxn_has_edge(N(i1), N(i2));
+
+    define simultaneous(_i : interval_t, i1, i2 : invocation_t) : boolean
+    = pi1(g(i1)) == _i
+        && tag_same(g(i1), g(i2));
+
+    define chronological_2(_i : interval_t, a, b : invocation_t) : boolean
+    = pi1(g(a)) == _i
+        && (exists (t : integer) :: t >= 0 && invoke_before(t, a, b));
+
+    define chronological_3(_i : interval_t, a, b, c : invocation_t) : boolean
+    = pi1(g(a)) == _i 
+        && (exists (t1 : integer) :: t1 >= 0 && invoke_before(t1, a, b))
+        && (exists (t2 : integer) :: t2 >= 0 && invoke_before(t2, b, c));
+
+    // Need to set up 2 variables to track the history of invocation
+    define periodic(_i : interval_t, i_prev, i_present : invocation_t) : integer
+    = if (pi1(g(i_present)) == _i
+        && (exists (g : interval_t) :: invoke_immediately_before(g, i_prev, i_present)))
+        then tag_diff(g(i_present), g(i_prev)) else -1;
+
+    // Need to set up 2 variables to track the history of invocation
+    define sporadic(_i : interval_t, i_prev, i_present : invocation_t, 
+                    m : interval_t) : boolean
+    = pi1(g(i_present)) == _i
+        && (exists (g : interval_t) :: invoke_immediately_before(g, i_prev, i_present))
+        && tag_diff(g(i_present), g(i_prev)) >= m;
 }
 
