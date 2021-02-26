@@ -123,12 +123,4 @@ module EventQ
     next {
         call () = run();
     }
-
-    control {
-        // v = verify(pushQ);
-        v = verify(popQ);
-        check;
-        print_results;
-        v.print_cex();
-    }
 }
