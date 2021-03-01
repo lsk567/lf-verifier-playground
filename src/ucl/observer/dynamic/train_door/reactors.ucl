@@ -251,11 +251,10 @@ module main {
     // and that "train_door_concurrent <==> !train_before_door && !door_before_train".
     
     // FIXME: should we embed the non-NULL in the first operand?
-
     property[LTL] door_always_closes_before_train_moves :
         G((train.invocation != __NULL && door.invocation != __NULL) 
             ==> invoke_before(0, train.invocation, door.invocation));
-    
+
     property[LTL] train_door_are_concurrent :
         G((train.invocation != __NULL && door.invocation != __NULL) 
             ==> (!invoke_before(0, train.invocation, door.invocation)

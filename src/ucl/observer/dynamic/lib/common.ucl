@@ -22,9 +22,11 @@ module common {
      */
     type timestamp_t = integer;
     type interval_t  = integer;
+    type microstep_t = integer;
+
     type tag_t = {
         timestamp_t,
-        interval_t
+        microstep_t
     };
 
     // Projection macros
@@ -64,6 +66,8 @@ module common {
     = rxn_precede(r1, r2);
 
     // Topology graph
+    // FIXME: strict superset of precedence graph
+    //          returns minimum delay
     define _rxn_has_edge(r1, r2 : _rxn_id_t) : boolean
     = rxn_has_edge(r1, r2);
 

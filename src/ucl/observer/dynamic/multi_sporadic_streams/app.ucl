@@ -1,0 +1,27 @@
+module config {
+    // FIXME: boolean const is not implemented in UCLID5.
+    const enable_stutter : integer = 0;
+}
+
+// Contains application-specific information.
+module app {
+    // Reaction ID
+    type rxn_id_t = enum { NULL, source_1, sink_1 };
+    
+    // Precedence in reaction graph
+    define rxn_precede(r1, r2 : rxn_id_t) : boolean
+    = r1 == source_1 && r2 == sink_1;
+
+    // Topology graph
+    define rxn_has_edge(r1, r2 : rxn_id_t) : boolean
+    = (r1 == r2)
+        || (r1 == source_1 && r2 == sink_1);
+
+    // Reachability in topology graph
+    define rxn_reach(r1, r2 : rxn_id_t) : boolean
+    = (r1 == r2)
+        || (r1 == source_1 && r2 == sink_1);
+
+    // Logical delays
+    const source_out_sink_in_DELAY : interval_t = 0;
+}
