@@ -1,0 +1,142 @@
+module common {
+
+    type * = app.*;
+    define * = app.*;
+    const * = app.*;
+
+    /**
+     * Time tag-related types and macros
+     */
+    type timestamp_t = integer;
+    type interval_t  = integer;
+    type microstep_t = integer;
+
+    type tag_t = {
+        timestamp_t,
+        microstep_t
+    };
+
+    // Projection macros
+    define pi1(t : tag_t) : timestamp_t = t._1;
+    define pi2(t : tag_t) : interval_t = t._2;
+
+    // Tag comparison
+    define tag_later(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1._1 > t2._1 || (t1._1 == t2._1 && t1._2 > t2._2)) then true else false;
+
+    define tag_same(t1 : tag_t, t2 : tag_t) : boolean
+        = if (t1 == t2) then true else false;
+
+    define tag_earlier(t1 : tag_t, t2 : tag_t) : boolean
+        = !tag_later(t1, t2) && !tag_same(t1, t2);
+
+    // Tag algebra
+    define tag_schedule(t : tag_t, i : interval_t) : tag_t
+        = if (i < 0) then t else (if (i == 0) then { pi1(t), pi2(t) + 1 } else { pi1(t) + i, 0 });
+
+    define tag_delay(t : tag_t, i : interval_t) : tag_t
+        = { pi1(t) + i, pi2(t) };
+
+    // Only consider timestamp for now.
+    define tag_diff(t1, t2: tag_t) : interval_t
+        = pi1(t1) - pi1(t2);
+
+    /**
+     * Reaction graph + Topology graph
+     * FIXME: perhaps there are more efficient encodings.
+     */
+    type _rxn_id_t = rxn_id_t;
+
+    // Precedence in reaction graph
+    define _rxn_precede(r1, r2 : _rxn_id_t) : boolean
+    = rxn_precede(r1, r2);
+
+    // Topology graph
+    // FIXME: strict superset of precedence graph
+    //          returns minimum delay
+    define _rxn_has_edge(r1, r2 : _rxn_id_t) : boolean
+    = rxn_has_edge(r1, r2);
+
+    // Reachability derived from the topology graph
+    define _rxn_reach(r1, r2 : _rxn_id_t) : boolean
+    = rxn_reach(r1, r2);
+
+    /**
+     * Reaction invocation
+     */
+    type invocation_t = { _rxn_id_t, tag_t };
+
+    // Projection macros
+    define N(i : invocation_t) : _rxn_id_t = i._1;
+    define g(i : invocation_t) : tag_t = i._2;
+
+    /**
+     * Message type
+     */
+    // msg_t should have a trigger and an arrival tag, which turns out to be
+    // the same as invocation_t. In this model, the source reactor generates
+    // an invocation, which the sink reactor can directly map on its timeline.
+    type msg_t = invocation_t;
+
+    /**
+     * Trace
+     */
+    const START : integer = 0;
+    const END : integer = 9;
+
+    define in_range(num : integer) : boolean
+    = num >= START && num <= END;
+
+    type step_t = integer;
+    type trace_t = { 
+        invocation_t,
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t 
+    };
+
+    define get(tr : trace_t, i : step_t) : invocation_t
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else (
+                if (i == 3) then tr._4 else (
+                    if (i == 4) then tr._5 else (
+                        if (i == 5) then tr._6 else (
+                            if (i == 6) then tr._7 else (
+                                if (i == 7) then tr._8 else (
+                                    if (i == 8) then tr._9 else (
+                                        if (i == 9) then tr._10 else (
+                                            { NULL, {-1, -1} }
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
+    define in_trace(_tr : trace_t, inv : invocation_t) : boolean
+    = (exists (j : step_t) :: in_range(j) && get(_tr, j) == inv);
+
+    /**
+     * Invoke before & temporal operators
+     */
+    // Defining "invoke before"
+    // Relies on assumption #2.
+    define invoke_before(_i : interval_t, i1, i2 : invocation_t) : boolean
+    = (_i == 0 
+            ==> (tag_same(g(i1), g(i2))) 
+                && _rxn_precede(N(i1), N(i2)))
+        && (_i > 0 
+            ==> (tag_diff(g(i1), g(i2)) == _i 
+                && _rxn_reach(N(i1), N(i2))));
+}
