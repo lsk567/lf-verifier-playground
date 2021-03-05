@@ -1,6 +1,6 @@
 module app {
 
-    type rxn_id_t = enum { A2, B1, C1 };
+    type rxn_id_t = enum { NULL, A2, B1, C1 };
     type reactor_id_t = enum { A, B, C };
 
     // Reaction precedence relation
@@ -108,7 +108,51 @@ module common {
     /**
      * Trace
      */
+    const START : integer = 0;
+    const END : integer = 9;
+
+    define in_range(num : integer) : boolean
+    = num >= START && num <= END;
+
     type step_t = integer;
+    type trace_t = { 
+        invocation_t,
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t 
+    };
+
+    define get(tr : trace_t, i : step_t) : invocation_t
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else (
+                if (i == 3) then tr._4 else (
+                    if (i == 4) then tr._5 else (
+                        if (i == 5) then tr._6 else (
+                            if (i == 6) then tr._7 else (
+                                if (i == 7) then tr._8 else (
+                                    if (i == 8) then tr._9 else (
+                                        if (i == 9) then tr._10 else (
+                                            { NULL, {-1, -1} }
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
+    define in_trace(_tr : trace_t, inv : invocation_t) : boolean
+    = (exists (j : step_t) :: in_range(j) && get(_tr, j) == inv);
 
     /**
      * Invoke before & temporal operators
@@ -130,43 +174,55 @@ module main {
     define * = common.*;
     const * = common.*;
 
-    var trace_A : [step_t]invocation_t;
-    var trace_B : [step_t]invocation_t;
-    var trace_C : [step_t]invocation_t;
-
-    const START : integer = 0;
-    const END : integer = 2;
-
-    define in_range(num : integer) : boolean
-    = num >= START && num <= END;
+    var trace_A : trace_t;
+    var trace_B : trace_t;
+    var trace_C : trace_t;
 
     // Derive axioms from the static information of the program.
     // Tag should appear in increasing order for a timeline.
     axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
-        ==> (tag_earlier(g(trace_A[i]), g(trace_A[j]))
-            || tag_same(g(trace_A[i]), g(trace_A[j]))));
+        ==> (tag_earlier(g(get(trace_A, i)), g(get(trace_A, j)))
+            || tag_same(g(get(trace_A, i)), g(get(trace_A, j)))));
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_B, i)), g(get(trace_B, j)))
+            || tag_same(g(get(trace_B, i)), g(get(trace_B, j)))));
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_C, i)), g(get(trace_C, j)))
+            || tag_same(g(get(trace_C, i)), g(get(trace_C, j)))));
 
     // Timestamp and microstep should be non-negative.
     axiom(forall (i : step_t) :: in_range(i)
-        ==> (pi1(g(trace_A[i])) >= 0 && pi2(g(trace_A[i])) >= 0));
+        ==> (pi1(g(get(trace_A, i))) >= 0 && pi2(g(get(trace_A, i))) >= 0));
     axiom(forall (i : step_t) :: in_range(i)
-        ==> (pi1(g(trace_B[i])) >= 0 && pi2(g(trace_B[i])) >= 0));
+        ==> (pi1(g(get(trace_B, i))) >= 0 && pi2(g(get(trace_B, i))) >= 0));
     axiom(forall (i : step_t) :: in_range(i)
-        ==> (pi1(g(trace_C[i])) >= 0 && pi2(g(trace_C[i])) >= 0));
+        ==> (pi1(g(get(trace_C, i))) >= 0 && pi2(g(get(trace_C, i))) >= 0));
         
     // Each reactor only invokes its own reactions.
-    axiom(forall (i : step_t) :: N(trace_A[i]) == A2);
-    axiom(forall (j : step_t) :: N(trace_B[j]) == B1);
-    axiom(forall (k : step_t) :: N(trace_C[k]) == C1);
+    axiom(forall (i : step_t) :: in_range(i) ==> N(get(trace_A, i)) == A2);
+    axiom(forall (j : step_t) :: in_range(j) ==> N(get(trace_B, j)) == B1);
+    axiom(forall (k : step_t) :: in_range(k) ==> N(get(trace_C, k)) == C1);
 
     // Connections
-    axiom(forall (i : step_t) :: N(trace_A[i]) == A2
-        ==> (exists (j : step_t) :: N(trace_B[j]) == B1
-            && g(trace_B[j]) == tag_delay(g(trace_A[j]), A_out_B_in_DELAY)));
+    axiom(forall (i : step_t) :: N(get(trace_A, i)) == A2
+        ==> (exists (j : step_t) :: N(get(trace_B, j)) == B1
+            && g(get(trace_B, j)) == tag_delay(g(get(trace_A, i)), A_out_B_in_DELAY)));
+    axiom(forall (i : step_t) :: N(get(trace_B, i)) == B1
+        ==> (exists (j : step_t) :: N(get(trace_C, j)) == C1
+            && g(get(trace_C, j)) == tag_delay(g(get(trace_B, i)), B_out_C_in_DELAY)));
+    
+    // Same reaction cannot invoke twice in the same instant
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_A, i)) == N(get(trace_A, j))
+            ==> g(get(trace_A, i)) != g(get(trace_A, j))))));
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_B, i)) == N(get(trace_B, j))
+            ==> g(get(trace_B, i)) != g(get(trace_B, j))))));
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_C, i)) == N(get(trace_C, j))
+            ==> g(get(trace_C, i)) != g(get(trace_C, j))))));
 
-    axiom(forall (i : step_t) :: N(trace_B[i]) == B1
-        ==> (exists (j : step_t) :: N(trace_C[j]) == C1
-            && g(trace_C[j]) == tag_delay(g(trace_B[j]), B_out_C_in_DELAY)));
+    // Reaction precedence
 
     // Modeling logical actions using axioms:
     // If we have a logical action with minimum spacing, then
@@ -178,27 +234,29 @@ module main {
     
     init {
         // Initialize the traces
+        // assume(get(trace_A, 0) == { A2, {10,0} });
         /*
-        trace_A[0] = { A2, {1,0} };
-        trace_A[1] = { A2, {3,0} };
-        trace_A[2] = { A2, {5,0} };
+        assume(get(trace_A, 0) == { A2, {1,0} });
+        assume(get(trace_A, 1) == { A2, {3,0} });
+        assume(get(trace_A, 2) == { A2, {5,0} });
 
-        trace_B[0] = { B1, {1,0} };
-        trace_B[1] = { B1, {3,0} };
-        trace_B[2] = { B1, {5,0} };
+        assume(get(trace_B, 0) == { B1, {1,0} });
+        assume(get(trace_B, 1) == { B1, {3,0} });
+        assume(get(trace_B, 2) == { B1, {5,0} });
 
-        trace_C[0] = { C1, {1,0} };
-        trace_C[1] = { C1, {3,0} };
-        trace_C[2] = { C1, {5,0} };
+        assume(get(trace_C, 0) == { C1, {1,0} });
+        assume(get(trace_C, 1) == { C1, {3,0} });
+        assume(get(trace_C, 2) == { C1, {5,0} });
         */
     }
 
     property prop : forall (i, j : step_t) ::
         (in_range(i) && in_range(j))
-            ==> (invoke_before(0, trace_A[i], trace_C[j]))
+            ==> (invoke_before(0, get(trace_A, i), get(trace_C, j)))
                 ==> (exists (k : step_t) ::
-                    invoke_before(0, trace_A[i], trace_B[k])
-                    && invoke_before(0, trace_B[k], trace_C[j]));
+                    invoke_before(0, get(trace_A, i), get(trace_B, k))
+                    && invoke_before(0, get(trace_B, k), get(trace_C, j)));
+
 
     control {
         v = unroll(0);
