@@ -1,0 +1,65 @@
+module main {
+    
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var trace_A : trace_t;
+    var trace_B : trace_t;
+
+    // Derive axioms from the static information of the program.
+    // Tag should appear in increasing order for a timeline.
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_A, i)), g(get(trace_A, j)))
+            || tag_same(g(get(trace_A, i)), g(get(trace_A, j)))));
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_B, i)), g(get(trace_B, j)))
+            || tag_same(g(get(trace_B, i)), g(get(trace_B, j)))));
+
+    // Timestamp and microstep should be non-negative.
+    // FIXME: microsteps are disabled for now for simplicity.
+    //          When enabled, there are some edge cases regarding
+    //          microsteps and latency and sporadic def. that make
+    //          things complicated.
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi1(g(get(trace_A, i))) >= 0 && pi2(g(get(trace_A, i))) == 0));
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi1(g(get(trace_B, i))) >= 0 && pi2(g(get(trace_B, i))) == 0));
+        
+    // Each reactor only invokes its own reactions or NULL.
+    axiom(forall (i : step_t) :: in_range(i) ==> (N(get(trace_A, i)) == A1) ||
+                                                    N(get(trace_A, i)) == NULL);
+    axiom(forall (j : step_t) :: in_range(j) ==> (N(get(trace_B, j)) == B1) ||
+                                                    N(get(trace_B, j)) == NULL);
+
+    // Same reaction cannot invoke twice in the same instant
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_A, i)) == N(get(trace_A, j))
+            ==> g(get(trace_A, i)) != g(get(trace_A, j))))));
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_B, i)) == N(get(trace_B, j))
+            ==> g(get(trace_B, i)) != g(get(trace_B, j))))));
+
+    // Connections: an invocation will be followed by a downstream invocation
+    // separated by a logical delay.
+    axiom(forall (i : step_t) :: N(get(trace_A, i)) == A1
+        ==> (exists (j : step_t) :: N(get(trace_B, j)) == B1
+            && g(get(trace_B, j)) == tag_delay(g(get(trace_A, i)), rxn_delay(A1, B1))));
+    axiom(forall (i : step_t) :: N(get(trace_B, i)) == B1
+        ==> (exists (j : step_t) :: N(get(trace_A, j)) == A1
+            && g(get(trace_A, j)) == tag_delay(g(get(trace_B, i)), rxn_delay(B1, A1))));
+    
+    // Property: There is no causality loop
+    property no_causal_loop : !(exists (i, j : step_t) :: 
+        (!isNULL(get(trace_A, i))
+        && !isNULL(get(trace_B, j)))
+        && (invoke_before(get(trace_A, i), get(trace_B, j))
+            && invoke_before(get(trace_B ,j), get(trace_A, i)))); 
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}

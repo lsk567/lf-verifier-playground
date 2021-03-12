@@ -6,7 +6,6 @@ module main {
 
     var trace_A : trace_t;
     var trace_B : trace_t;
-    // var trace_C : trace_t;
 
     // Derive axioms from the static information of the program.
     // Tag should appear in increasing order for a timeline.
@@ -16,11 +15,6 @@ module main {
     axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
         ==> (tag_earlier(g(get(trace_B, i)), g(get(trace_B, j)))
             || tag_same(g(get(trace_B, i)), g(get(trace_B, j)))));
-    /*
-    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
-        ==> (tag_earlier(g(get(trace_C, i)), g(get(trace_C, j)))
-            || tag_same(g(get(trace_C, i)), g(get(trace_C, j)))));
-    */
 
     // Timestamp and microstep should be non-negative.
     // FIXME: microsteps are disabled for now for simplicity.
@@ -31,20 +25,12 @@ module main {
         ==> (pi1(g(get(trace_A, i))) >= 0 && pi2(g(get(trace_A, i))) == 0));
     axiom(forall (i : step_t) :: in_range(i)
         ==> (pi1(g(get(trace_B, i))) >= 0 && pi2(g(get(trace_B, i))) == 0));
-    /*
-    axiom(forall (i : step_t) :: in_range(i)
-        ==> (pi1(g(get(trace_C, i))) >= 0 && pi2(g(get(trace_C, i))) == 0));
-    */
         
     // Each reactor only invokes its own reactions or NULL.
     axiom(forall (i : step_t) :: in_range(i) ==> (N(get(trace_A, i)) == A1) ||
                                                     N(get(trace_A, i)) == NULL);
     axiom(forall (j : step_t) :: in_range(j) ==> (N(get(trace_B, j)) == B1) ||
                                                     N(get(trace_B, j)) == NULL);
-    /*
-    axiom(forall (k : step_t) :: in_range(k) ==> (N(get(trace_C, k)) == C1) ||
-                                                    N(get(trace_C, k)) == NULL);
-    */
 
     // Same reaction cannot invoke twice in the same instant
     axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
@@ -53,31 +39,7 @@ module main {
     axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
         ==> (i != j ==> ((N(get(trace_B, i)) == N(get(trace_B, j))
             ==> g(get(trace_B, i)) != g(get(trace_B, j))))));
-    /*
-    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
-        ==> (i != j ==> ((N(get(trace_C, i)) == N(get(trace_C, j))
-            ==> g(get(trace_C, i)) != g(get(trace_C, j))))));
-    */
 
-    // Connections: an invocation will be followed by a downstream invocation
-    // separated by a logical delay.
-    /*
-    axiom(forall (i : step_t) :: N(get(trace_A, i)) == A1
-        ==> (exists (j : step_t) :: N(get(trace_C, j)) == C1
-            && g(get(trace_C, j)) == tag_delay(g(get(trace_A, i)), rxn_delay(A1, C1))));
-    axiom(forall (i : step_t) :: N(get(trace_B, i)) == B1
-        ==> (exists (j : step_t) :: N(get(trace_C, j)) == C1
-            && g(get(trace_C, j)) == tag_delay(g(get(trace_B, i)), rxn_delay(B1, C1))));
-    */
-    /*
-    axiom(forall (i : step_t) :: N(get(trace_C, i)) == C1
-        ==> (exists (j : step_t) ::
-            ((N(get(trace_A, j)) == A1
-                && invoke_immediately_before(get(trace_A, j), get(trace_C, i)))
-            || (N(get(trace_B, j)) == B1
-                && invoke_immediately_before(get(trace_B, j), get(trace_C, i))))));
-    */
-    
     // Physical actions with minimum spacing
     // Assuming min_spacing is 10
     // Helper macro
@@ -99,7 +61,6 @@ module main {
     // The event stream is sporadic
     property prop1 : sporadic(0, trace_A, A1, 10);
     property prop2 : sporadic(0, trace_B, B1, 10);
-    // property prop3 : !sporadic(0, trace_C, C1, 10);
 
     // FIXME: hard to debug
     // Property: For all minimum spacing m, there exists traces A B C,

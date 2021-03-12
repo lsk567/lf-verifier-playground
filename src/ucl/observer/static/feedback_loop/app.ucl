@@ -1,0 +1,28 @@
+module app {
+
+    type rxn_id_t = enum { NULL, A1, B1 };
+    type reactor_id_t = enum { A, B };
+
+    // Reaction precedence relation
+    define rxn_precede(r1, r2 : rxn_id_t) : boolean
+    = (r1 == A1 && r2 == B1);
+
+    // Connections in the topology
+    define rxn_has_edge(r1, r2 : rxn_id_t) : boolean
+    = (r1 == r2)
+        || (r1 == A1 && r2 == B1)
+        || (r1 == B1 && r2 == A1);
+
+    // Logical delays between reactions
+    // (specified by connections & actions)
+    define rxn_delay(r1, r2 : rxn_id_t) : integer
+    = if (r1 == r2) then 0 else (
+        if (r1 == A1 && r2 == B1) then 0 else (
+            if (r1 == B1 && r2 == A1) then 10 else -1));
+
+    // Reachability relation derived from topology graph
+    define rxn_reach(r1, r2 : rxn_id_t) : boolean
+    = (r1 == r2)
+        || (r1 == A1 && r2 == B1)
+        || (r1 == B1 && r2 == A1);
+}
