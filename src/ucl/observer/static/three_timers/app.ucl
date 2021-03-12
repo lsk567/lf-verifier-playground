@@ -1,0 +1,52 @@
+module app {
+
+    type rxn_id_t = enum { NULL, A1, A2, B1, B2, C1, C2 };
+    type reactor_id_t = enum { A, B, C };
+
+    // Reaction precedence relation
+    define rxn_precede(r1, r2 : rxn_id_t) : boolean
+    = (r1 == A1 && r2 == A2)
+        || (r1 == A1 && r2 == B2)
+        || (r1 == B1 && r2 == B2)
+        || (r1 == B1 && r2 == C2)
+        || (r1 == C1 && r2 == C2)
+        || (r1 == C1 && r2 == A2);
+
+    // Connectivity graph: precedence graph + connections + actions
+    define rxn_has_edge(r1, r2 : rxn_id_t) : boolean
+        // Connections
+    = (r1 == r2)
+        || (r1 == A1 && r2 == B2)
+        || (r1 == B1 && r2 == C2)
+        || (r1 == C1 && r2 == A2)
+        // Precedence
+        || (r1 == A1 && r2 == A2)
+        || (r1 == B1 && r2 == B2)
+        || (r1 == C1 && r2 == C2)
+        // Actions
+        ;
+
+    // Logical delays between reactions
+    // (specified by connections & actions)
+    define rxn_delay(r1, r2 : rxn_id_t) : integer
+    = if (r1 == r2) then 0 else (
+        if (r1 == A1 && r2 == B2) then 2 else (
+            if (r1 == B1 && r2 == C2) then 5 else (
+                if (r1 == C1 && r2 == A2) then 0 else -1)));
+
+    // Transitive closure of connectivity graph
+    define rxn_reach(r1, r2 : rxn_id_t) : boolean
+    = (r1 == r2)
+        || (r1 == A1 && r2 == B2)
+        || (r1 == B1 && r2 == C2)
+        || (r1 == C1 && r2 == A2)
+        || (r1 == A1 && r2 == A2)
+        || (r1 == B1 && r2 == B2)
+        || (r1 == C1 && r2 == C2)
+        ;
+
+    // Timer period
+    const T_A_PERIOD : integer = 7;
+    const T_B_PERIOD : integer = 5;
+    const T_C_PERIOD : integer = 3;
+}
