@@ -1,0 +1,67 @@
+module main {
+    
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var trace_A : trace_t;
+
+    // Derive axioms from the static information of the program.
+
+    // Tag should appear in increasing order for a timeline.
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_A, i)), g(get(trace_A, j)))
+            || tag_same(g(get(trace_A, i)), g(get(trace_A, j)))));
+
+    // Timestamp and microstep should be non-negative.
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi1(g(get(trace_A, i))) >= 0 && pi2(g(get(trace_A, i))) >= 0));
+        
+    // Each reactor only invokes its own reactions or NULL.
+    axiom(forall (i : step_t) :: in_range(i) ==> (N(get(trace_A, i)) == A1) ||
+                                                    N(get(trace_A, i)) == NULL);
+
+    // Same reaction cannot invoke twice in the same instant
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_A, i)) == N(get(trace_A, j))
+            ==> g(get(trace_A, i)) != g(get(trace_A, j))))));
+
+    /*
+    // FIXME: this seems to suppress all the NULL outputs
+    // (For aesthetics) NULL invocation should have a (-1, -1) tag
+    axiom(forall (i : step_t) :: in_range(i) ==> (N(get(trace_A, i)) == NULL)
+        ==> g(get(trace_A, i)) == {-1, -1});
+    */
+
+    // Connections: an invocation will be followed by a downstream invocation
+    // separated by a logical delay.
+    // No connection.
+    
+    // Physical actions with minimum spacing
+    // Assuming min_spacing is 10
+
+    // Helper macro
+    define are_consecutive_invocations_of_same_rxn(trace: trace_t, 
+        a, b : step_t) : boolean
+    = (N(get(trace, a)) == N(get(trace, b)) && a < b
+        && !(exists (k : step_t) :: (a < k && k < b
+            && N(get(trace, k)) == N(get(trace, a)))));
+
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> are_consecutive_invocations_of_same_rxn(trace_A, i, j)
+            ==> latency(get(trace_A, i), get(trace_A, j)) >= 10);
+
+    // The event stream is sporadic
+    property prop1 : sporadic(0, trace_A, A1, 10);
+
+    // The event stream is periodic
+    // property prop2 : periodic(0, trace_A, A1, 10);
+
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}

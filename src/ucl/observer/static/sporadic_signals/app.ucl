@@ -1,0 +1,25 @@
+module app {
+
+    // A1: controller's reaction that closes door and turns on the engine
+    // B1: enables / disables the engine
+    // C1: opens / closes the door
+    type rxn_id_t = enum { NULL, A1 };
+    type reactor_id_t = enum { A };
+
+    // Reaction precedence relation
+    define rxn_precede(r1, r2 : rxn_id_t) : boolean
+    = false;
+
+    // Connections in the topology
+    define rxn_has_edge(r1, r2 : rxn_id_t) : boolean
+    = r1 == r2;
+
+    // Logical delays between reactions
+    // (specified by connections & actions)
+    define rxn_delay(r1, r2 : rxn_id_t) : integer
+    = if (r1 == r2) then 0 else -1;
+
+    // Reachability relation derived from topology graph
+    define rxn_reach(r1, r2 : rxn_id_t) : boolean
+    = r1 == r2;
+}
