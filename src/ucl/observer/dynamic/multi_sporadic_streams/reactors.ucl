@@ -220,12 +220,23 @@ module main {
         sporadic_var' = sporadic(pi1(sink.clock), sink.prev_invocation, sink.invocation, source.period);
     }
     
-    property[LTL] sporadic_invocation : (
+    /*
+    property[LTL] sporadic_event_stream_v1 : (
         G(
             (sink.prev_invocation != __NULL
             && sink.invocation != __NULL
             && sink.prev_invocation != sink.invocation) // to avoid synchronization issue
                 ==> !(sporadic(pi1(sink.clock), sink.prev_invocation, sink.invocation, 10))
+        )
+    );
+    */
+
+    property[LTL] sporadic_event_stream_v2 : (
+        G(
+            (sink.prev_invocation != __NULL
+            && sink.invocation != __NULL
+            && sink.prev_invocation != sink.invocation) // to avoid synchronization issue
+                ==> (exists (m : integer) :: (m > 1 && sporadic(pi1(sink.clock), sink.prev_invocation, sink.invocation, m)))
         )
     );
     
