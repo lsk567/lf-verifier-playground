@@ -1,1 +1,1 @@
-uclid app.ucl ../lib/common2.ucl aircraft_door.ucl
+uclid app.ucl ../lib/common2.ucl main.ucl 

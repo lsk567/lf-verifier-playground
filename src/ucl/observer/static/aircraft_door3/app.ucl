@@ -20,6 +20,8 @@ module app {
         || (r1 == A2 && r2 == C1);
 
     // Logical delays
-    const A_out_B_in_DELAY : interval_t = 0;
-    const B_out_C_in_DELAY : interval_t = 0;
+    define rxn_delay(r1, r2 : rxn_id_t) : integer
+    = if (r1 == r2) then 0 else (
+        if (r1 == A2 && r2 == B1) then 0 else (
+            if (r1 == B1 && r2 == C1) then 0 else -1));
 }

@@ -36,10 +36,10 @@ module main {
     // Connections
     axiom(forall (i : step_t) :: N(get(trace_A, i)) == A2
         ==> (exists (j : step_t) :: N(get(trace_B, j)) == B1
-            && g(get(trace_B, j)) == tag_delay(g(get(trace_A, i)), A_out_B_in_DELAY)));
+            && g(get(trace_B, j)) == tag_delay(g(get(trace_A, i)), rxn_delay(A2, B1))));
     axiom(forall (i : step_t) :: N(get(trace_B, i)) == B1
         ==> (exists (j : step_t) :: N(get(trace_C, j)) == C1
-            && g(get(trace_C, j)) == tag_delay(g(get(trace_B, i)), B_out_C_in_DELAY)));
+            && g(get(trace_C, j)) == tag_delay(g(get(trace_B, i)), rxn_delay(B1, C1))));
     
     // Same reaction cannot invoke twice in the same instant
     axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
