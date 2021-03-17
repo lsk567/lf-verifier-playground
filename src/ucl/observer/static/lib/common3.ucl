@@ -32,7 +32,8 @@ module common {
 
     // Tag algebra
     define tag_schedule(t : tag_t, i : interval_t) : tag_t
-        = if (i < 0) then t else (if (i == 0) then { pi1(t), pi2(t) + 1 } else { pi1(t) + i, 0 });
+        = if (i == 0) then { pi1(t), pi2(t) + 1 } else (
+            if (i > 0) then { pi1(t) + i, 0 } else { -1, -1 });
 
     define tag_delay(t : tag_t, i : interval_t) : tag_t
         = { pi1(t) + i, pi2(t) };
