@@ -66,7 +66,7 @@ module main {
     // Property: For all minimum spacing m, there exists traces A B C,
     //           such that trace C is not sporadic.
     property prop4 : forall (m : integer) :: m > 0
-        && (exists (trace : trace_t) :: (
+        && !(exists (trace : trace_t) :: (
 
             // Tag should appear in increasing order for a timeline.
             (forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 

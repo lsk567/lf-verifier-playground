@@ -55,7 +55,7 @@ module main {
     property prop1 : sporadic(0, trace_A, A1, 10);
 
     // The event stream is periodic
-    // property prop2 : periodic(0, trace_A, A1, 10);
+    property prop2 : periodic(0, trace_A, A1, 10);
 
 
     control {
