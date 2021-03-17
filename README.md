@@ -1,7 +1,6 @@
-# Verifying Lingua Franca programs with UCLID5
+# Verifying Reactor Systems
 
-This repository hosts the slides and source code produced in the process of verifying Lingua Franca programs using the UCLID5
-verification engine.
+This repository hosts the slides and source code produced in the process of verifying reactor systems.
 
 ### Running an LF program
 Please refer to the [LF Wiki](https://github.com/icyphy/lingua-franca/wiki/Downloading-and-Building) for installation instructions.
