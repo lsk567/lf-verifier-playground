@@ -100,7 +100,7 @@ module common {
             ==> (tag_same(g(i1), g(i2))) 
                 && _rxn_precede(N(i1), N(i2)))
         && (_i > 0 
-            ==> (tag_diff(g(i1), g(i2)) == _i 
+            ==> (tag_diff(g(i2), g(i1)) == _i
                 && _rxn_reach(N(i1), N(i2))));
 
     define invoke_immediately_before(_i : interval_t, i1, i2 : invocation_t) : boolean
