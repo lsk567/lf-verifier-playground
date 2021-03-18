@@ -1,0 +1,57 @@
+module app {
+
+    type rxn_id_t = enum { NULL, 
+                            Server_L_1, Server_L_2, Server_L_3, Server_L_4,
+                            Database_L_1, Database_L_2, Database_L_3,
+                            Server_R_1, Server_R_2, Server_R_3, Server_R_4,
+                            Database_R_1, Database_R_2, Database_R_3
+                            };
+
+    define rxn_priority(r1, r2 : rxn_id_t) : boolean
+    =   // Left platform
+        (r1 == Server_L_1 && r2 == Server_L_2)
+        || (r1 == Server_L_2 && r2 == Server_L_3)
+        || (r1 == Server_L_3 && r2 == Server_L_4)
+        // Right platform
+        || (r1 == Server_R_1 && r2 == Server_R_2)
+        || (r1 == Server_R_2 && r2 == Server_R_3)
+        || (r1 == Server_R_3 && r2 == Server_R_4);
+
+    define rxn_linked_by_connection(r1, r2 : rxn_id_t) : boolean
+    =  (r1 == Server_L_1 && r2 == Database_L_3)
+        || (r1 == Server_L_2 && r2 == Database_L_1)
+        || (r1 == Database_L_3 && r2 == Server_L_3)
+        || (r1 == Server_R_1 && r2 == Database_R_3)
+        || (r1 == Server_R_2 && r2 == Database_R_1)
+        || (r1 == Database_R_3 && r2 == Server_R_3)
+        // Connections between platforms
+        || (r1 == Database_L_1 && r2 == Database_R_2)
+        || (r1 == Database_R_1 && r2 == Database_L_2);
+
+    define rxn_linked_by_action(r1, r2 : rxn_id_t) : boolean
+    = false; // No actions in this case.
+
+    // Reaction precedence relation: reaction priority + connections
+    // Only encode the *immediate* dependencies (1 level).
+    // We will encode the reachability relation into the proof task.
+    define prec_graph_has_edge(r1, r2 : rxn_id_t) : boolean
+    = rxn_priority(r1, r2)
+        || rxn_linked_by_connection(r1, r2);
+
+    // Connectivity graph: precedence graph (including connections) + actions
+    // FIXME: connectivity graph should not include reaction priority, only
+    // connections and actions.
+    define conn_graph_has_edge(r1, r2 : rxn_id_t) : boolean
+    = rxn_linked_by_connection(r1, r2)
+        || rxn_linked_by_action(r1, r2);
+
+    // Logical delays between reactions
+    // (specified by connections & actions)
+    define rxn_delay(r1, r2 : rxn_id_t) : integer
+    = 0; // Only store non-zero delays here.
+
+
+    // Timer period
+    const QUERY_PERIOD : integer = 150;
+    const UPDATE_PERIOD : integer = 100;
+}

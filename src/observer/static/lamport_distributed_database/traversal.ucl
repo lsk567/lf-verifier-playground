@@ -1,0 +1,157 @@
+module main {
+    
+    type    * = common.*;
+    define  * = common.*;
+    const   * = common.*;
+
+    /**
+     * Traversal of graphs
+     */
+    // Method 3: use tuples to represent traces.
+    type traversal_t = { 
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t,
+        rxn_id_t
+    };
+    define get2(tr : traversal_t, i : integer) : rxn_id_t
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else (
+                if (i == 3) then tr._4 else (
+                    if (i == 4) then tr._5 else (
+                        if (i == 5) then tr._6 else (
+                            if (i == 6) then tr._7 else (
+                                if (i == 7) then tr._8 else (
+                                    if (i == 8) then tr._9 else (
+                                        if (i == 9) then tr._10 else (
+                                            NULL
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
+    // Method 4
+    // Let solver traverse the precedence graph
+    // type traversal_t = [integer]rxn_id_t;
+
+    /**
+     * Method 2 & 3:
+     * Checking transitive relations with tarversal variables 
+     * instead of an Exists quantifier.
+     */
+    var Server_L_1_TO_Server_R_4 : traversal_t;
+    var Server_L_1_TO_Server_L_4 : traversal_t;
+
+    // A more efficient way to encode transitive relation.
+    // If index i is reaction A, then index i+1 must be a reaction that
+    // depends on A.
+
+    // Method 1: a correct but inefficient implementation
+    // due to quantified data structures.
+    /*
+    define rxn_precede(r1, r2 : rxn_id_t) : boolean
+    = exists (path : traversal_t, j : integer) :: (
+        0 <= j && j < 10
+        && get2(path, 0) == r1 
+        && get2(path, j) == r2
+        && (forall (k : integer) :: (k >= 0 && k <= j - 1)
+            ==> prec_graph_has_edge(get2(path, k), get2(path, k+1)))
+        );
+    */
+
+    // Method 3
+    define rxn_precede(r1, r2 : rxn_id_t, path : traversal_t) : boolean
+    = (exists (j : integer) :: (
+        0 <= j && j < 10
+        && get2(path, 0) == r1 
+        && get2(path, j) == r2
+        && (forall (k : integer) :: (k >= 0 && k <= j - 1)
+            ==> prec_graph_has_edge(get2(path, k), get2(path, k+1)))
+        ));
+
+    /*
+    // Method 4: not readable but more scalable than tuples.
+    define rxn_precede(r1, r2 : rxn_id_t, path : traversal_t) : boolean
+    = (exists (j : integer) :: (
+        0 <= j
+        && path[0] == r1 
+        && path[j] == r2
+        && (forall (k : integer) :: (k >= 0 && k <= j - 1)
+            ==> prec_graph_has_edge(path[k], path[k+1]))));
+    */
+
+    /*
+    define rxn_reach(r1, r2 : rxn_id_t) : boolean
+    = exists (path : traversal_t, i : integer, j : integer) :: (
+    // = exists (i : integer, j : integer) :: (
+        i < j
+        && 0 <= i && i < 10 && 0 <= j && j < 10
+        && get2(path, i) == r1 
+        && get2(path, j) == r2
+        && (forall (k : integer) :: (i <= k && k <= j - 1)
+            ==> conn_graph_has_edge(get2(path, k), get2(path, k+1))));
+    */
+
+    // Notes
+    //
+    // "Find me *a* trace that Server_L_1 reaches Server_L_3."
+    // Solver returns a dependency path.
+    // property test_precedence : !rxn_precede(Server_L_1, Server_L_3); 
+    //
+    // "Find me *a* trace that Server_L_1 does not reach Server_L_3."
+    // Solver responds with {NULL, NULL, ...}
+    // property test_precedence : rxn_precede(Server_L_1, Server_L_4); 
+    //
+    // Therefore, for valid paths, "exists (j : integer) ..." never reaches unsat.
+    // For invalid paths, the property returns unsat for !rxn_precede.
+
+    // Method 2: embed the assumptions about finding valid traversals
+    // right after declaring traversal variables.
+    // Downside: when there are no feasible traversals, all paths are blocked.
+    // So ALL properties in the same file become trivially true, which is undesirable.
+    // We want the context of each property to be separated.
+    /*
+    property test_path1 : Server_L_1_TO_Server_R_4 == 
+    {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL}
+    */
+
+    // Method 3 & 4 (currently adopted): use nondeterministic variables
+    // to check whether there are feasible graph traversals.
+    // If sat, there is a valid graph traversal. If unsat, then there isn't.
+    property test_valid_path : !rxn_precede(
+        Server_L_1,
+        Server_L_4,
+        Server_L_1_TO_Server_L_4
+    );
+    property test_invalid_path : !rxn_precede(
+        Server_L_1,
+        Server_R_4,
+        Server_L_1_TO_Server_R_4
+    );
+
+    // Micellaneous
+    // For unroll, each property is independent and has its own .smt file.
+    // property fal : true;
+    // Checking immediate precedence is easy.
+    // property test_rxn_priority : prec_graph_has_edge(Server_L_1, Server_L_4);
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}

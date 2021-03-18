@@ -1,0 +1,128 @@
+module main {
+    
+    type    * = common.*;
+    define  * = common.*;
+    const   * = common.*;
+
+    var trace_platform_l : trace_t;
+    var trace_platform_r : trace_t;
+
+    // Derive axioms from the static information of the program.
+    // Tag should appear in increasing order for a timeline.
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_platform_l, i)), g(get(trace_platform_l, j)))
+            || tag_same(g(get(trace_platform_l, i)), g(get(trace_platform_l, j)))));
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_platform_r, i)), g(get(trace_platform_r, j)))
+            || tag_same(g(get(trace_platform_r, i)), g(get(trace_platform_r, j)))));
+
+    // Timestamp and microstep should be non-negative.
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi1(g(get(trace_platform_l, i))) >= 0
+            && pi2(g(get(trace_platform_l, i))) >= 0));
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi1(g(get(trace_platform_r, i))) >= 0
+            && pi2(g(get(trace_platform_r, i))) >= 0));
+        
+    // Each reactor only invokes its own reactions or NULL.
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (N(get(trace_platform_l, i)) == Server_L_1) 
+            || (N(get(trace_platform_l, i)) == Server_L_2)
+            || (N(get(trace_platform_l, i)) == Server_L_3)
+            || (N(get(trace_platform_l, i)) == Server_L_4)
+            || (N(get(trace_platform_l, i)) == Database_L_1)
+            || (N(get(trace_platform_l, i)) == Database_L_2)
+            || (N(get(trace_platform_l, i)) == Database_L_3)
+            || N(get(trace_platform_l, i)) == NULL);
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (N(get(trace_platform_r, i)) == Server_R_1) 
+            || (N(get(trace_platform_r, i)) == Server_R_2)
+            || (N(get(trace_platform_r, i)) == Server_R_3)
+            || (N(get(trace_platform_r, i)) == Server_R_4)
+            || (N(get(trace_platform_r, i)) == Database_R_1)
+            || (N(get(trace_platform_r, i)) == Database_R_2)
+            || (N(get(trace_platform_r, i)) == Database_R_3)
+            || N(get(trace_platform_r, i)) == NULL);
+
+    // Same reaction cannot invoke twice in the same instant
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j)
+        && i != j && (N(get(trace_platform_l, i)) == N(get(trace_platform_l, j))))
+            ==> g(get(trace_platform_l, i)) != g(get(trace_platform_l, j)));
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j)
+        && i != j && (N(get(trace_platform_r, i)) == N(get(trace_platform_r, j))))
+            ==> g(get(trace_platform_r, i)) != g(get(trace_platform_r, j)));
+
+    // Timers
+    // - Need an i < 9 on the quantified i because 8 is the max index this holds for.
+    // - Forall is followed by ==>. Exists is followed by &&.
+    // - The last !Exists ensures that each timer event has a unique next event.
+    axiom(forall (i : step_t) :: (N(get(trace_A, i)) == A1 && i < 9)
+        ==> (exists (j : step_t) :: (j > i && in_range(j))
+            && (N(get(trace_A, j)) == A1
+                && g(get(trace_A, j)) == tag_schedule(g(get(trace_A, i)), T_A_PERIOD))
+                && !(exists (k : step_t) :: N(get(trace_A, k)) == A1
+                    && tag_earlier(g(get(trace_A, k)), g(get(trace_A, j)))
+                    && tag_later(g(get(trace_A, k)), g(get(trace_A, i))))));
+    axiom(forall (i : step_t) :: (N(get(trace_B, i)) == B1 && i < 9)
+        ==> (exists (j : step_t) :: (j > i && in_range(j))
+            && (N(get(trace_B, j)) == B1
+                && g(get(trace_B, j)) == tag_schedule(g(get(trace_B, i)), T_B_PERIOD))
+                && !(exists (k : step_t) :: N(get(trace_B, k)) == B1
+                    && tag_earlier(g(get(trace_B, k)), g(get(trace_B, j)))
+                    && tag_later(g(get(trace_B, k)), g(get(trace_B, i))))));
+    axiom(forall (i : step_t) :: (N(get(trace_C, i)) == C1 && i < 9)
+        ==> (exists (j : step_t) :: (j > i && in_range(j))
+            && (N(get(trace_C, j)) == C1
+                && g(get(trace_C, j)) == tag_schedule(g(get(trace_C, i)), T_C_PERIOD))
+                && !(exists (k : step_t) :: N(get(trace_C, k)) == C1
+                    && tag_earlier(g(get(trace_C, k)), g(get(trace_C, j)))
+                    && tag_later(g(get(trace_C, k)), g(get(trace_C, i))))));
+
+    /**
+     * Connections
+     */
+    /*
+    // An invocation will be followed by a downstream invocation
+    // separated by a logical delay.
+    axiom(forall (i : step_t) :: (N(get(trace_A, i)) == A1 && i < 9)
+        ==> (exists (j : step_t) :: N(get(trace_B, j)) == B2
+            && g(get(trace_B, j)) == tag_delay(g(get(trace_A, i)), rxn_delay(A1, B2))));
+    axiom(forall (i : step_t) :: (N(get(trace_B, i)) == B1 && i < 9)
+        ==> (exists (j : step_t) :: N(get(trace_C, j)) == C2
+            && g(get(trace_C, j)) == tag_delay(g(get(trace_B, i)), rxn_delay(B1, C2))));
+    axiom(forall (i : step_t) :: (N(get(trace_C, i)) == C1 && i < 9)
+        ==> (exists (j : step_t) :: N(get(trace_A, j)) == A2
+            && g(get(trace_A, j)) == tag_delay(g(get(trace_C, i)), rxn_delay(C1, A2))));
+
+    // For every downstream reaction, there needs to be a corresponding upstream reaction.
+    axiom(forall (j : step_t) :: (N(get(trace_B, j)) == B2 && j < 10)
+        ==> (exists (i : step_t) :: N(get(trace_A, i)) == A1
+            && g(get(trace_B, j)) == tag_delay(g(get(trace_A, i)), rxn_delay(A1, B2))));
+    axiom(forall (j : step_t) :: (N(get(trace_C, j)) == C2 && j < 10)
+        ==> (exists (i : step_t) :: N(get(trace_B, i)) == B1
+            && g(get(trace_C, j)) == tag_delay(g(get(trace_B, i)), rxn_delay(B1, C2))));
+    axiom(forall (j : step_t) :: (N(get(trace_A, j)) == A2 && j < 10)
+        ==> (exists (i : step_t) :: N(get(trace_C, i)) == C1
+            && g(get(trace_A, j)) == tag_delay(g(get(trace_C, i)), rxn_delay(C1, A2))));
+    */
+
+    // Reaction precedence
+    /*
+    axiom(forall (i, j : step_t) :: tag_same(g(get(trace_A, i)), g(get(trace_A, j)))
+        && rxn_precede(N(get(trace_A, i)), N(get(trace_A, j)))
+            ==> i < j);
+    axiom(forall (i, j : step_t) :: tag_same(g(get(trace_B, i)), g(get(trace_B, j)))
+        && rxn_precede(N(get(trace_B, i)), N(get(trace_B, j)))
+            ==> i < j);
+    axiom(forall (i, j : step_t) :: tag_same(g(get(trace_C, i)), g(get(trace_C, j)))
+        && rxn_precede(N(get(trace_C, i)), N(get(trace_C, j)))
+            ==> i < j);
+    */
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
