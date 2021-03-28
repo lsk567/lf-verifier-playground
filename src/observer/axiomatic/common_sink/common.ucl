@@ -1,0 +1,280 @@
+module common {
+
+    /**
+     * Time tag-related types and macros
+     */
+    type time_value_t = integer;
+    type time_unit_t = enum { INF, SEC, MSEC };
+    type time_t = {
+        time_value_t,
+        time_unit_t
+    };
+
+    type timestamp_t = time_t;
+    type microstep_t = integer;
+    type tag_t = {
+        timestamp_t,
+        microstep_t
+    };
+    type interval_t  = tag_t;
+
+    // Projection macros
+    define pi1(t : tag_t) : timestamp_t = t._1;         // Get timestamp from tag
+    define pi2(t : tag_t) : microstep_t = t._2;         // Get microstep from tag
+    define pi3(t : time_t) : time_value_t = t._1;       // Get time value from time
+    define pi4(t : time_t) : time_unit_t = t._2;        // Get time unit from time
+    define pi5(t : tag_t) : time_value_t = pi3(pi1(t)); // Get time value from tag
+    define pi6(t : tag_t) : time_unit_t = pi4(pi1(t));  // Get time unit from tag
+
+    // Convert to MSEC when the unit is SEC. If the unit is INF or MSEC (base),
+    // use the original value.
+    define base_time(t : time_t) : time_t
+    = if (pi4(t) == SEC) then {pi3(t) * 1000, MSEC} else t;
+
+    define base_tag(t : tag_t) : tag_t
+    = { base_time(pi1(t)), pi2(t) };
+
+    define base_unit() : time_unit_t
+    = MSEC;
+
+    // Interval constructor
+    define zero() : interval_t
+    = {{0, base_unit()}, 0};
+    define mstep() : interval_t
+    = {{0, base_unit()}, 1};
+    define msec(t : integer) : interval_t
+    = {{t, MSEC}, 0};
+    define sec(t : integer) : interval_t
+    = {{t, SEC}, 0};
+    define inf() : interval_t
+    = {{0, INF}, 0};
+
+    // Helper function
+    define isInf(i : interval_t) : boolean
+    = pi6(i) == INF;
+
+    // Tag comparison
+    // FIXME: currently all tags are assumed to be MSEC.
+    // Need to project to MSEC.
+    define tag_later(t1 : tag_t, t2 : tag_t) : boolean
+    = if (pi5(base_tag(t1)) > pi5(base_tag(t2))
+        || (pi5(base_tag(t1)) == pi5(base_tag(t2)) && pi2(t1) > pi2(t2))
+        || (!isInf(t1) && isInf(t2)))
+        then true else false;
+
+    define tag_same(t1 : tag_t, t2 : tag_t) : boolean
+    = if (base_tag(t1) == base_tag(t2)
+        || (isInf(t1) && isInf(t2))) then true else false;
+
+    define tag_earlier(t1 : tag_t, t2 : tag_t) : boolean
+    = !tag_later(t1, t2) && !tag_same(t1, t2);
+
+    // Tag algebra
+    define tag_schedule(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && pi5(i) == 0 && !isInf(i)) then { { pi5(base_tag(t)), base_unit() }, pi2(t) + 1 } else (  // microstep delay
+        if (!isInf(t) && pi5(i) > 0 && !isInf(i)) then { { pi5(base_tag(t)) + pi5(base_tag(i)), base_unit() }, 0 } else inf());
+
+    define tag_delay(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && !isInf(i)) then { { pi5(base_tag(t)) + pi5(base_tag(i)), base_unit() }, pi2(t) + pi2(i) } else inf();
+
+    // Only consider timestamp for now.
+    define tag_diff(t1, t2: tag_t) : interval_t
+    = if (!isInf(t1) && !isInf(t2)) then { { pi5(t1) - pi5(t2), base_unit() }, pi2(t1) - pi2(t2) } else inf();
+
+    /**
+     * Reaction graph + Topology graph
+     * FIXME: perhaps there are more efficient encodings.
+     */
+    /*
+    type _rxn_id_t = rxn_id_t;
+
+    // Precedence in reaction graph
+    define _rxn_precede(r1, r2 : _rxn_id_t) : boolean
+    = rxn_precede(r1, r2);
+
+    // Topology graph
+    // FIXME: strict superset of precedence graph
+    //          returns minimum delay
+    define _rxn_has_edge(r1, r2 : _rxn_id_t) : boolean
+    = conn_graph_has_edge(r1, r2);
+
+    // Reachability derived from the topology graph
+    define _rxn_reach(r1, r2 : _rxn_id_t) : boolean
+    = rxn_reach(r1, r2);
+    */
+
+    /* Application specific */
+    //////////////////////////
+    // Reactor IDs
+    type r_id_t = enum { NN, A, B, C };
+
+    // Reaction IDs
+    type rxn_id_t = enum { NULL, A1, A2, B1, B2, C1 };
+
+    define rxn_to_r(rxn : rxn_id_t) : r_id_t
+    = if (rxn == A1 || rxn == A2) then A else (
+        if (rxn == B1 || rxn == B2) then B else (
+            if (rxn == C1) then C else NN));
+
+    // Weight of edges in the connectivity graph
+    define edge_weight(r1, r2 : rxn_id_t) : interval_t
+        // Reaction priority
+    =   if (r1 == B1 && r2 == B2) then zero() else (
+        // Connection
+        if (r1 == A2 && r2 == B1) then msec(5) else (
+        if (r1 == C1 && r2 == B2) then msec(10) else (
+        // Action
+        if (r1 == A1 && r2 == A2) then mstep() else (
+        // Microstep from last rxn to first rxn
+        if (r1 == A2 && r2 == A1) then mstep() else (
+        if (r1 == B2 && r2 == B1) then mstep() else inf()))))); 
+
+    define path_weight(r1, r2 : rxn_id_t) : interval_t
+        // Reaction priority
+    =   if (r1 == B1 && r2 == B2) then zero() else (
+        // Connection
+        if (r1 == A2 && r2 == B1) then msec(5) else (
+        if (r1 == C1 && r2 == B2) then msec(10) else (
+        // Action
+        if (r1 == A1 && r2 == A2) then mstep() else (
+        // Microstep from last rxn to first rxn
+        if (r1 == A2 && r2 == A1) then mstep() else (
+        if (r1 == B2 && r2 == B1) then mstep() else (
+        // Path weight
+        if (r1 == A1 && r2 == B1) then tag_delay(edge_weight(A1, A2), 
+                                        edge_weight(A2, B1)) else (
+        if (r1 == A1 && r2 == B2) then tag_delay(tag_delay(edge_weight(A1, A2), 
+                                        edge_weight(A2, B1)), 
+                                        edge_weight(B1, B2)) else (
+        if (r1 == C1 && r2 == B1) then tag_delay(edge_weight(C1, B2), 
+                                        edge_weight(B2, B1)) else (
+        inf()))))))))); 
+    //////////////////////////
+
+    /**
+     * Reaction invocation
+     */
+    type invocation_t = { rxn_id_t, tag_t };
+
+    // Projection macros
+    define N(i : invocation_t) : rxn_id_t = i._1;
+    define g(i : invocation_t) : tag_t = i._2;
+
+    // Check if an invocation is NULL
+    define isNULL(i : invocation_t) : boolean
+    = N(i) == NULL;
+
+    /**
+     * Message type
+     */
+    // msg_t should have a trigger and an arrival tag, which turns out to be
+    // the same as invocation_t. In this model, the source reactor generates
+    // an invocation, which the sink reactor can directly map on its timeline.
+    type msg_t = invocation_t;
+
+    /**
+     * Trace
+     */
+    const START : integer = 0;
+    const END : integer = 9;
+
+    define in_range(num : integer) : boolean
+    = num >= START && num <= END;
+
+    type step_t = integer;
+    type trace_t = { 
+        invocation_t,
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t, 
+        invocation_t 
+    };
+
+    define get(tr : trace_t, i : step_t) : invocation_t
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else (
+                if (i == 3) then tr._4 else (
+                    if (i == 4) then tr._5 else (
+                        if (i == 5) then tr._6 else (
+                            if (i == 6) then tr._7 else (
+                                if (i == 7) then tr._8 else (
+                                    if (i == 8) then tr._9 else (
+                                        if (i == 9) then tr._10 else (
+                                            { NULL, inf() }
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
+    define in_trace(_tr : trace_t, inv : invocation_t) : boolean
+    = (exists (j : step_t) :: in_range(j) && get(_tr, j) == inv);
+
+
+
+    /**
+     * Invoke before & temporal operators
+     */
+    // The "invoke before" relation
+    // Relies on assumption #2.
+    // It is important to note that due to nested reactors,
+    // we still have a strict partial order within a reactor.
+    define invoke_before(i1, i2 : invocation_t) : boolean
+    = !tag_later(tag_delay(g(i1), path_weight(N(i1), N(i2))), g(i2));  
+
+    define latency(i1, i2 : invocation_t) : interval_t
+    = if (tag_later(g(i1), g(i2))) then tag_diff(g(i1), g(i2)) else tag_diff(g(i2), g(i1));
+
+    // 1. Invoke before holds
+    // 2. Has direct edge
+    // 3. Latency equals the logical delay on the connection / action.
+    /*
+    define invoke_immediately_before(i1, i2 : invocation_t) : boolean
+    = invoke_before(i1, i2) 
+        && _rxn_has_edge(N(i1), N(i2))
+        && latency(i1, i2) == rxn_delay(N(i1), N(i2));
+    */
+    define invoke_immediately_before(i1, i2 : invocation_t) : boolean
+    = tag_same(tag_delay(g(i1), path_weight(N(i1), N(i2))), g(i2));  
+
+    // FIXME: simultaneousAt
+    // FIXME: de-couple start_time from operators.
+    define simultaneous(i1, i2 : invocation_t) : boolean
+    = tag_same(g(i1), g(i2));
+
+    define chronological_2(a, b : invocation_t) : boolean
+    = invoke_before(a, b);
+
+    define chronological_3(a, b, c : invocation_t) : boolean
+    =  invoke_before(a, b)
+        && invoke_before(b, c);
+
+    /*
+    define periodic(start_time : timestamp_t, trace : trace_t,
+        rxn : rxn_id_t, p : interval_t) : boolean
+    = forall (i, j : step_t) :: (pi1(g(get(trace, i))) > start_time && i < j
+                                    && N(get(trace, i)) == rxn && N(get(trace, j)) == rxn
+                                    && !(exists (k : step_t) :: i < k && k < j 
+                                        && N(get(trace, k)) == rxn))
+        ==> (tag_diff(g(get(trace, j)), g(get(trace, i))) == p);
+
+    define sporadic(start_time : timestamp_t, trace : trace_t,
+        rxn : rxn_id_t, min_spacing : interval_t) : boolean
+    = forall (i, j : step_t) :: (pi1(g(get(trace, i))) > start_time && i < j
+                                    && N(get(trace, i)) == rxn && N(get(trace, j)) == rxn
+                                    && !(exists (k : step_t) :: i < k && k < j 
+                                        && N(get(trace, k)) == rxn))
+        ==> (tag_diff(g(get(trace, j)), g(get(trace, i))) >= min_spacing);
+    */
+}

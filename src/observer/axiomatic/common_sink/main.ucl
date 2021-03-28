@@ -1,0 +1,127 @@
+module main {
+    
+    type * = common.*;
+    define * = common.*;
+    const * = common.*;
+
+    var trace_A : trace_t;
+    var trace_B : trace_t;
+    var trace_C : trace_t;
+
+    // Derive axioms from the static information of the program.
+    // Tag should appear in increasing order for a timeline.
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_A, i)), g(get(trace_A, j)))
+            || tag_same(g(get(trace_A, i)), g(get(trace_A, j)))));
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_B, i)), g(get(trace_B, j)))
+            || tag_same(g(get(trace_B, i)), g(get(trace_B, j)))));
+    axiom(forall (i, j : step_t) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(get(trace_C, i)), g(get(trace_C, j)))
+            || tag_same(g(get(trace_C, i)), g(get(trace_C, j)))));
+
+    // Timestamp and microstep should be non-negative.
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi5(g(get(trace_A, i))) >= 0 && pi2(g(get(trace_A, i))) >= 0));
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi5(g(get(trace_B, i))) >= 0 && pi2(g(get(trace_B, i))) >= 0));
+    axiom(forall (i : step_t) :: in_range(i)
+        ==> (pi5(g(get(trace_C, i))) >= 0 && pi2(g(get(trace_C, i))) >= 0));
+
+	/*
+	// Non-NULL events should not have INF tag
+	axiom(forall (i : step_t) :: in_range(i)
+		==> (N(get(trace_A, i)) != NULL ==> pi6(g(get(trace_A, i))) != INF));
+	axiom(forall (i : step_t) :: in_range(i)
+		==> (N(get(trace_B, i)) != NULL ==> pi6(g(get(trace_B, i))) != INF));
+	axiom(forall (i : step_t) :: in_range(i)
+		==> (N(get(trace_C, i)) != NULL ==> pi6(g(get(trace_C, i))) != INF));
+	*/
+        
+    // Each reactor only invokes its own reactions or NULL.
+    axiom(forall (i : step_t) :: in_range(i) ==> (N(get(trace_A, i)) == A1
+												|| N(get(trace_A, i)) == A2
+                                                || N(get(trace_A, i)) == NULL));
+    axiom(forall (j : step_t) :: in_range(j) ==> (N(get(trace_B, j)) == B1
+												|| N(get(trace_B, j)) == B2
+                                                || N(get(trace_B, j)) == NULL));
+    axiom(forall (k : step_t) :: in_range(k) ==> (N(get(trace_C, k)) == C1
+                                                || N(get(trace_C, k)) == NULL));
+
+    // Same reaction cannot invoke twice in the same instant
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_A, i)) == N(get(trace_A, j))
+            ==> g(get(trace_A, i)) != g(get(trace_A, j))))));
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_B, i)) == N(get(trace_B, j))
+            ==> g(get(trace_B, i)) != g(get(trace_B, j))))));
+    axiom(forall (i, j : step_t) :: (in_range(i) && in_range(j))
+        ==> (i != j ==> ((N(get(trace_C, i)) == N(get(trace_C, j))
+            ==> g(get(trace_C, i)) != g(get(trace_C, j))))));
+
+    // An invocation will be followed by a downstream invocation
+    // separated by a logical delay.
+    axiom(forall (i : step_t) :: (N(get(trace_A, i)) == A1 && i < 9)
+        ==> (exists (j : step_t) :: N(get(trace_A, j)) == A2
+            && g(get(trace_A, j)) == tag_delay(g(get(trace_A, i)), edge_weight(A1, A2)))); 
+    axiom(forall (i : step_t) :: (N(get(trace_A, i)) == A2 && i < 9)
+        ==> (exists (j : step_t) :: N(get(trace_B, j)) == B1
+            && g(get(trace_B, j)) == tag_delay(g(get(trace_A, i)), edge_weight(A2, B1)))); 
+    axiom(forall (i : step_t) :: (N(get(trace_C, i)) == C1 && i < 9)
+        ==> (exists (j : step_t) :: N(get(trace_B, j)) == B2
+            && g(get(trace_B, j)) == tag_delay(g(get(trace_C, i)), edge_weight(C1, B2)))); 
+
+    axiom(forall (i : step_t) :: (N(get(trace_A, i)) == A2 && i < 10)
+        ==> (exists (j : step_t) :: N(get(trace_A, j)) == A1
+            && g(get(trace_A, i)) == tag_delay(g(get(trace_A, j)), edge_weight(A1, A2)))); 
+    axiom(forall (i : step_t) :: (N(get(trace_B, i)) == B1 && i < 10)
+        ==> (exists (j : step_t) :: N(get(trace_A, j)) == A2
+            && g(get(trace_B, i)) == tag_delay(g(get(trace_A, j)), edge_weight(A2, B1)))); 
+    axiom(forall (i : step_t) :: (N(get(trace_B, i)) == B2 && i < 10)
+        ==> (exists (j : step_t) :: N(get(trace_C, j)) == C1
+            && g(get(trace_B, i)) == tag_delay(g(get(trace_C, j)), edge_weight(C1, B2)))); 
+
+
+	// If the trace contains {C1, {{0, MSEC}, 0}} and {B1, {{20, MSEC}, 1}},
+	// C1 invokes before B1.
+	property prop : forall (i, j : step_t) :: (in_range(i) && N(get(trace_C, i)) == C1
+						&& g(get(trace_C, i)) == zero()
+						&& in_range(j) && N(get(trace_B, j)) == B1
+						&& g(get(trace_B, j)) == {{20, MSEC}, 1})
+						==> invoke_before(get(trace_C, i), get(trace_B, j));
+	property prop2 : forall (i, j : step_t) :: (in_range(i) && N(get(trace_C, i)) == C1
+						&& g(get(trace_C, i)) == zero()
+						&& in_range(j) && N(get(trace_B, j)) == B1
+						&& g(get(trace_B, j)) == {{20, MSEC}, 1})
+						==> !invoke_before(get(trace_C, i), get(trace_B, j));
+	/*
+	property prop3 : !(exists (i, j : step_t) :: (in_range(i) && N(get(trace_C, i)) == C1
+						&& g(get(trace_C, i)) == zero()
+						&& in_range(j) && N(get(trace_B, j)) == B1
+						&& g(get(trace_B, j)) == {{20, MSEC}, 1}));
+	property prop4 : !invoke_before({C1, {{0, MSEC}, 0}}, {B1, {{20, MSEC}, 1}});
+	*/
+
+	// If the trace contains {C1, {{0, MSEC}, 0}} and {B1, {{20, MSEC}, 1}},
+	// C1 invokes before B1.
+	// FIXME: What about the following case? Can we reduce precedence to microstep?
+	/*
+	property prop5 : forall (i, j : step_t) :: (in_range(i) && N(get(trace_C, i)) == C1
+						&& g(get(trace_C, i)) == zero()
+						&& in_range(j) && N(get(trace_B, j)) == B1
+						&& g(get(trace_B, j)) == {{10, MSEC}, 1})
+						==> invoke_before(get(trace_C, i), get(trace_B, j));
+	property prop6 : forall (i, j : step_t) :: (in_range(i) && N(get(trace_C, i)) == C1
+						&& g(get(trace_C, i)) == zero()
+						&& in_range(j) && N(get(trace_B, j)) == B1
+						&& g(get(trace_B, j)) == {{10, MSEC}, 1})
+						==> !invoke_before(get(trace_C, i), get(trace_B, j));
+	*/
+ 
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
