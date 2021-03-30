@@ -81,7 +81,6 @@ module main {
         ==> (exists (j : step_t) :: N(get(trace_C, j)) == C1
             && g(get(trace_B, i)) == tag_delay(g(get(trace_C, j)), edge_weight(C1, B2)))); 
 
-
 	// If the trace contains {C1, {{0, MSEC}, 0}} and {B1, {{20, MSEC}, 1}},
 	// C1 invokes before B1.
 	property prop : forall (i, j : step_t) :: (in_range(i) && N(get(trace_C, i)) == C1

@@ -1,8 +1,8 @@
 module common {
 
-    /**
-     * Time tag-related types and macros
-     */
+    /*************************************
+     * Time tag-related types and macros *
+     *************************************/
     type time_value_t = integer;
     type time_unit_t = enum { INF, SEC, MSEC };
     type time_t = {
@@ -19,12 +19,12 @@ module common {
     type interval_t  = tag_t;
 
     // Projection macros
-    define pi1(t : tag_t) : timestamp_t = t._1;         // Get timestamp from tag
-    define pi2(t : tag_t) : microstep_t = t._2;         // Get microstep from tag
-    define pi3(t : time_t) : time_value_t = t._1;       // Get time value from time
-    define pi4(t : time_t) : time_unit_t = t._2;        // Get time unit from time
-    define pi5(t : tag_t) : time_value_t = pi3(pi1(t)); // Get time value from tag
-    define pi6(t : tag_t) : time_unit_t = pi4(pi1(t));  // Get time unit from tag
+    define pi1(t : tag_t)   : timestamp_t   = t._1;         // Get timestamp from tag
+    define pi2(t : tag_t)   : microstep_t   = t._2;         // Get microstep from tag
+    define pi3(t : time_t)  : time_value_t  = t._1;       // Get time value from time
+    define pi4(t : time_t)  : time_unit_t   = t._2;        // Get time unit from time
+    define pi5(t : tag_t)   : time_value_t  = pi3(pi1(t)); // Get time value from tag
+    define pi6(t : tag_t)   : time_unit_t   = pi4(pi1(t));  // Get time unit from tag
 
     // Convert to MSEC when the unit is SEC. If the unit is INF or MSEC (base),
     // use the original value.
@@ -81,28 +81,9 @@ module common {
     define tag_diff(t1, t2: tag_t) : interval_t
     = if (!isInf(t1) && !isInf(t2)) then { { pi5(t1) - pi5(t2), base_unit() }, pi2(t1) - pi2(t2) } else inf();
 
-    /**
-     * Reaction graph + Topology graph
-     * FIXME: perhaps there are more efficient encodings.
-     */
-    /*
-    type _rxn_id_t = rxn_id_t;
-
-    // Precedence in reaction graph
-    define _rxn_precede(r1, r2 : _rxn_id_t) : boolean
-    = rxn_precede(r1, r2);
-
-    // Topology graph
-    // FIXME: strict superset of precedence graph
-    //          returns minimum delay
-    define _rxn_has_edge(r1, r2 : _rxn_id_t) : boolean
-    = conn_graph_has_edge(r1, r2);
-
-    // Reachability derived from the topology graph
-    define _rxn_reach(r1, r2 : _rxn_id_t) : boolean
-    = rxn_reach(r1, r2);
-    */
-
+    /**********************************
+     * Reactions & connectivity graph *
+     **********************************/
     /* Application specific */
     //////////////////////////
     // Reactor IDs
@@ -151,9 +132,9 @@ module common {
         inf()))))))))); 
     //////////////////////////
 
-    /**
-     * Reaction invocation
-     */
+    /***********************
+     * Reaction invocation *
+     ***********************/
     type invocation_t = { rxn_id_t, tag_t };
 
     // Projection macros
@@ -172,9 +153,9 @@ module common {
     // an invocation, which the sink reactor can directly map on its timeline.
     type msg_t = invocation_t;
 
-    /**
-     * Trace
-     */
+    /*********
+     * Trace *
+     *********/
     const START : integer = 0;
     const END : integer = 9;
 
@@ -221,11 +202,9 @@ module common {
     define in_trace(_tr : trace_t, inv : invocation_t) : boolean
     = (exists (j : step_t) :: in_range(j) && get(_tr, j) == inv);
 
-
-
-    /**
-     * Invoke before & temporal operators
-     */
+    /**************************************
+     * Invoke before & temporal operators *
+     **************************************/
     // The "invoke before" relation
     // Relies on assumption #2.
     // It is important to note that due to nested reactors,
@@ -236,15 +215,8 @@ module common {
     define latency(i1, i2 : invocation_t) : interval_t
     = if (tag_later(g(i1), g(i2))) then tag_diff(g(i1), g(i2)) else tag_diff(g(i2), g(i1));
 
-    // 1. Invoke before holds
-    // 2. Has direct edge
-    // 3. Latency equals the logical delay on the connection / action.
-    /*
-    define invoke_immediately_before(i1, i2 : invocation_t) : boolean
-    = invoke_before(i1, i2) 
-        && _rxn_has_edge(N(i1), N(i2))
-        && latency(i1, i2) == rxn_delay(N(i1), N(i2));
-    */
+    // A stronger invoke_before where the latency between two invocations
+    // is the same as the path weight.
     define invoke_immediately_before(i1, i2 : invocation_t) : boolean
     = tag_same(tag_delay(g(i1), path_weight(N(i1), N(i2))), g(i2));  
 
