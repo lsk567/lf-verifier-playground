@@ -1,0 +1,57 @@
+target C;
+
+reactor A {
+    
+    timer t(0, 5 sec);
+    output out:int;
+    state s:int(0);
+    
+    reaction(t) {=
+        // Does nothing but precedes A2.
+    =}
+    
+    reaction(t) -> out {=
+        SET(out, (self->s)++);
+    =}
+}
+
+reactor B {
+    
+    timer t(0, 1 sec);
+    input _in:int;
+    output out:int;
+    
+    reaction(_in, t) -> out {=
+        // ... Consume value
+        if (_in->is_present) {
+            SET(out, _in->value);
+        }
+        else {
+            printf("B1 triggered but not by A1.\n");
+        }
+    =}
+}
+
+reactor C {
+    
+    input _in:int;
+    
+    reaction(_in) {=
+        // ... Consume value
+        printf("The received value is: %d. Time: (%lld, %u)\n", _in->value, get_elapsed_logical_time(), get_microstep());
+    =}
+}
+
+main reactor {
+    
+    // Property: 
+    // 1. Every invocation of A will cause an invocation of C.
+    // 2. Every invocation of B that is not caused by A will not cause an invocation of C. 
+    
+    a = new A();
+    b = new B();
+    c = new C();
+    
+    a.out -> b._in;
+    b.out -> c._in;
+}
