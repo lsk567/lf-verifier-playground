@@ -1,0 +1,252 @@
+/**
+ * A manually written model exploring the following concepts:
+ * 1. A good set of timer-related axioms
+ * 1. (TODO) Individual trace variable for each component with a starting point.
+ * 2. (TODO) a HB definition consistent with Lamport's def.
+ * 3. (TODO) a full-blown three timers example that illustrate frames of reference.
+ */
+module main {
+ 
+    type    * = common.*;
+    define  * = common.*;
+    const   * = common.*;
+     
+    // Mark the start of the trace.
+    var start : timestamp_t;
+    assume(start >= 1000000000001);
+    
+    /*****************
+     * Helper Macros *
+     *****************/
+    define is_multiple_of(a, b : integer) : boolean
+    = exists (c : integer) :: b * c == a;
+
+    define is_closest_starting_point(now : tag_t, period : integer, offset : integer) : boolean
+    = (exists (c : integer) :: (period * c) + offset == pi1(now)
+        // Tick at the next valid instant.
+        && (period * (c - 1) + offset) < start)     
+        // Timer always has mstep of 0.
+        && pi2(now) == 0;                           
+    
+    /***************************************
+     * Axioms for a1 triggered by timer t1 *
+     ***************************************/
+    // The trace of a1
+    var trace_a1 : trace_t;
+
+    // Helper macro that returns an element based on index
+    define elem_a1(i : integer) : element_t
+    = get(trace_a1, i);
+
+    // Only shows a1
+    axiom(forall (i : integer) :: in_range(i) ==> id(elem_a1(i)) == a1);
+     
+    // Display trace_a1 in timestamp order
+    axiom(forall (i, j : integer) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(elem_a1(i)), g(elem_a1(j)))
+            || tag_same(g(elem_a1(i)), g(elem_a1(j)))));
+    
+    // All microsteps are positive
+    axiom(forall (i : integer) :: in_range(i)
+        ==> pi2(g(elem_a1(i))) >= 0);
+    
+    /*
+    // NULL events should appear in the suffix
+    axiom(forall (j : integer) :: in_range(j) ==> (
+        (id(elem_a1(j)) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
+        ((i < j) ==> id(elem_a1(i)) != NULL)
+    )));
+    */
+
+    // The trace should not have NULL events
+    axiom(forall (i : integer) :: in_range(i)
+        ==> !isNULL(elem_a1(i)));
+    
+    // [Updated] All tags should be positive
+    axiom(forall (i : integer) :: in_range(i) ==> (
+        pi1(g(elem_a1(i))) >= 0
+    ));
+
+    // Begin the frame at the start time specified.
+    axiom(forall (i : integer) :: tag_same(g(elem_a1(i)), {start, 0})
+        || tag_later(g(elem_a1(i)), {start, 0}));
+    
+    // Each reaction should have a preceding reaction that triggered it.
+
+    // 1. start the firing at the first valid instant closest to the start.
+    axiom(is_closest_starting_point(g(elem_a1(0)), pi1(msec(10)), pi1(msec(20))));
+
+    // 2. each subsequent firing is separated by the period.
+    axiom(forall (i : integer) :: (in_range(i) && i > 0)
+        ==> (g(elem_a1(i)) == tag_schedule(g(elem_a1(i-1)), msec(10))));
+
+
+    /************************************************
+     * Axioms for reaction a2 triggered by timer t2 *
+     ************************************************/
+    // The trace of a2
+    var trace_a2 : trace_t;
+
+    // Helper macro that returns an element based on index
+    define elem_a2(i : integer) : element_t
+    = get(trace_a2, i);
+     
+    // Only shows a2
+    axiom(forall (i : integer) :: in_range(i) ==> id(elem_a2(i)) == a2);
+     
+    // Display trace_a2 in timestamp order
+    axiom(forall (i, j : integer) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(elem_a2(i)), g(elem_a2(j)))
+            || tag_same(g(elem_a2(i)), g(elem_a2(j)))));
+    
+    // All microsteps are positive
+    axiom(forall (i : integer) :: in_range(i)
+        ==> pi2(g(elem_a2(i))) >= 0);
+    
+    // The trace should not have NULL events
+    axiom(forall (i : integer) :: in_range(i)
+        ==> !isNULL(elem_a2(i)));
+    
+    // [Updated] All tags should be positive
+    axiom(forall (i : integer) :: in_range(i) ==> (
+        pi1(g(elem_a2(i))) >= 0
+    ));
+
+    // Begin the frame at the start time specified.
+    axiom(forall (i : integer) :: tag_same(g(elem_a2(i)), {start, 0})
+        || tag_later(g(elem_a2(i)), {start, 0}));
+    
+    // Each reaction should have a preceding reaction that triggered it.
+
+    // 1. start the firing at the first valid instant closest to the start.
+    axiom(is_closest_starting_point(g(elem_a2(0)), pi1(msec(10)), 0));
+
+    // 2. each subsequent firing is separated by the period.
+    axiom(forall (i : integer) :: (in_range(i) && i > 0)
+        ==> (g(elem_a2(i)) == tag_schedule(g(elem_a2(i-1)), msec(10))));
+
+
+    /************************************************
+     * Axioms for reaction b1 triggered by timer t3 *
+     ************************************************/
+    // The trace of b1
+    var trace_b1 : trace_t;
+
+    // Helper macro that returns an element based on index
+    define elem_b1(i : integer) : element_t
+    = get(trace_b1, i);
+     
+    // Only shows b1
+    axiom(forall (i : integer) :: in_range(i) ==> id(elem_b1(i)) == b1);
+
+    // Display trace_b1 in timestamp order
+    axiom(forall (i, j : integer) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(elem_b1(i)), g(elem_b1(j)))
+            || tag_same(g(elem_b1(i)), g(elem_b1(j)))));
+    
+    // All microsteps are positive
+    axiom(forall (i : integer) :: in_range(i)
+        ==> pi2(g(elem_b1(i))) >= 0);
+    
+    // The trace should not have NULL events
+    axiom(forall (i : integer) :: in_range(i)
+        ==> !isNULL(elem_b1(i)));
+
+    // [Updated] All tags should be positive
+    axiom(forall (i : integer) :: in_range(i) ==> (
+        pi1(g(elem_b1(i))) >= 0
+    ));
+
+    // Begin the frame at the start time specified.
+    axiom(forall (i : integer) :: tag_same(g(elem_b1(i)), {start, 0})
+        || tag_later(g(elem_b1(i)), {start, 0}));
+    
+    // Each reaction should have a preceding reaction that triggered it.
+
+    // 1. start the firing at the first valid instant closest to the start.
+    axiom(is_closest_starting_point(g(elem_b1(0)), pi1(msec(12)), 0));
+
+    // 2. each subsequent firing is separated by the period.
+    axiom(forall (i : integer) :: (in_range(i) && i > 0)
+        ==> (g(elem_b1(i)) == tag_schedule(g(elem_b1(i-1)), msec(12))));
+
+
+    /**************************
+     * Axioms for reaction b2 *
+     **************************/
+    // The trace of b2
+    var trace_b2 : trace_t;
+
+    // Helper macro that returns an element based on index
+    define elem_b2(i : integer) : element_t
+    = get(trace_b2, i);
+
+    // Only shows b2
+    axiom(forall (i : integer) :: in_range(i) ==> id(elem_b2(i)) == b2);
+
+    // Display trace_b2 in timestamp order
+    axiom(forall (i, j : integer) :: (i < j && in_range(i) && in_range(j)) 
+        ==> (tag_earlier(g(elem_b2(i)), g(elem_b2(j)))
+            || tag_same(g(elem_b2(i)), g(elem_b2(j)))));
+    
+    // All microsteps are positive
+    axiom(forall (i : integer) :: in_range(i)
+        ==> pi2(g(elem_b2(i))) >= 0);
+    
+    // NULL events should appear in the suffix
+    axiom(forall (j : integer) :: in_range(j) ==> (
+        (id(elem_b2(j)) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
+        ((i < j) ==> id(elem_b2(i)) != NULL)
+    )));
+    
+    // [Updated] All tags should be positive
+    axiom(forall (i : integer) :: in_range(i) ==> (
+        pi1(g(elem_b2(i))) >= 0
+    ));
+
+    // Begin the frame at the start time specified.
+    axiom(forall (i : integer) :: tag_same(g(elem_b2(i)), {start, 0})
+        || tag_later(g(elem_b2(i)), {start, 0}));
+
+    // For every invocation of b2, there needs to be an instance of a2 upstream.
+    axiom(forall (i : integer) :: !isNULL(elem_b2(i))
+        ==> (exists (j : integer) :: !isNULL(elem_a2(j))
+            && g(elem_b2(i)) == tag_delay(g(elem_a2(j)), msec(1))
+        )
+    );
+
+
+    /**************
+     * Backburner *
+     **************/
+    /*
+    // first & last in trace_t1
+    define first(e : element_t) : boolean
+    = !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_earlier(g(elem_t1(i)), g(e))); 
+
+    define last(e : element_t) : boolean
+    = !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_later(g(elem_t1(i)), g(e))); 
+    */
+
+    // (Might not be a good thing to have, since we want to check unbounded props.)
+    // First invocation of A2 should start at 2 ms.
+
+    // Display simulatenous elements in order of priority
+     
+    // Startup should only appears once in each reactor
+     
+    // [placeholder] Add user-defined properties here.
+    // property test : !(exists (i : integer) :: in_range(i) && id(elem_a1(i)) == a1);
+
+    property test : false;
+     
+    //////////////////////////////////////////////////
+     
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex;
+    }
+     
+}
