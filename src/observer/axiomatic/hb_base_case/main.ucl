@@ -60,19 +60,19 @@ module main {
     =   // If two events belong to the same federate,
         // determine hb via tags.
         // This is bi-directional.
-        (( (id(e1) == id(e2))
+        (( (id(e1) == id(e2) && id(e1) != NULL && id(e2) != NULL)
         || (id(e1) == b1 && id(e2) == b2)
         || (id(e1) == b2 && id(e2) == b1)
         || (id(e1) == b1 && id(e2) == b3)
         || (id(e1) == b3 && id(e2) == b1)
         || (id(e1) == b2 && id(e2) == b3)
         || (id(e1) == b3 && id(e2) == b2))
-            ==> _hb_same_fed(e1, e2))
+            && _hb_same_fed(e1, e2))
         // If two events belong to different federates,
         // check if a connection is present.
         // This is uni-directional.
-        && (((id(e1) == a1 && id(e2) == b3))
-            ==> _hb_diff_fed(e1, e2));
+        || (((id(e1) == a1 && id(e2) == b3))
+            && _hb_diff_fed(e1, e2));
 
     // Check if a path (with 2 edges, in this case,) exists
     define hb(e1, e2 : element_t) : boolean
@@ -155,8 +155,9 @@ module main {
         || tag_later(g(elem(i)), {start, 0}));
     
     // [Important] The trace should respect the HB relation.
-    // axiom(forall (i, j : integer) :: hb(elem(i), elem(j))
-    //     ==> i < j);
+    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> (hb(elem(i), elem(j))
+        ==> i < j));
 
     /*******************************
      * Application-specific axioms *
