@@ -128,7 +128,6 @@ module main {
     /************************************************
      * Axioms for reaction b1 triggered by timer t3 *
      ************************************************/
-    /*
     // The trace of b1
     var trace_b1 : trace_t;
 
@@ -169,7 +168,6 @@ module main {
     // 2. each subsequent firing is separated by the period.
     axiom(forall (i : integer) :: (in_range(i) && i > 0)
         ==> (g(elem_b1(i)) == tag_schedule(g(elem_b1(i-1)), msec(12))));
-    */
 
     /**************************
      * Axioms for reaction b2 *
