@@ -48,33 +48,50 @@ module main {
     define connection_delay(i1, i2 : id_t) : interval_t
     = if (i1 == a1 && i2 == b3) then msec(10) else inf(); 
 
-    define _hb_same_fed(e1, e2 : element_t) : boolean
-    = tag_earlier(g(e1), g(e2)) ||
-        (tag_same(g(e1), g(e2)) && priority(id(e1)) < priority(id(e2)));
-
-    define _hb_diff_fed(e1, e2 : element_t) : boolean
-    = tag_earlier(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2))
-        || tag_same(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2));
-
-    define _hb(e1, e2 : element_t) : boolean
-    =   // If two events belong to the same federate,
-        // determine hb via tags.
-        // This is bi-directional.
-        (( (id(e1) == id(e2) && id(e1) != NULL && id(e2) != NULL)
+    // Return true if two events occur on the same federate.
+    define _id_same_fed(e1, e2 : element_t) : boolean
+    = (id(e1) == id(e2) && id(e1) != NULL && id(e2) != NULL)
         || (id(e1) == b1 && id(e2) == b2)
         || (id(e1) == b2 && id(e2) == b1)
         || (id(e1) == b1 && id(e2) == b3)
         || (id(e1) == b3 && id(e2) == b1)
         || (id(e1) == b2 && id(e2) == b3)
-        || (id(e1) == b3 && id(e2) == b2))
-            && _hb_same_fed(e1, e2))
+        || (id(e1) == b3 && id(e2) == b2);
+
+    // Return true if two events occur on different federates.
+    define _id_diff_fed(e1, e2 : element_t) : boolean
+    = (id(e1) == a1 && id(e2) == b3);
+
+    // Return true if e1 happened before e2 in the same federate,
+    // by comparing the tags and the priorities of the two events.
+    //
+    // TODO: account for nested reactors in federates.
+    define _hb_same_fed(e1, e2 : element_t) : boolean
+    = tag_earlier(g(e1), g(e2)) ||
+        (tag_same(g(e1), g(e2)) && priority(id(e1)) < priority(id(e2)));
+
+    // Return true if e1 happened before e2 in different federates
+    // and e1 has a connection to e2. This check uses the time tags
+    // and the logical delay in the connection.
+    //
+    // FIXME: account for physical connections.
+    define _hb_diff_fed(e1, e2 : element_t) : boolean
+    = tag_earlier(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2))
+        || tag_same(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2));
+
+    // Check the happened-before relation between two immediate events.
+    define _hb(e1, e2 : element_t) : boolean
+    =   // If two events belong to the same federate,
+        // determine hb via tags.
+        // This is bi-directional.
+        (_id_same_fed(e1, e2) && _hb_same_fed(e1, e2))
         // If two events belong to different federates,
         // check if a connection is present.
         // This is uni-directional.
-        || (((id(e1) == a1 && id(e2) == b3))
-            && _hb_diff_fed(e1, e2));
+        || (_id_diff_fed(e1, e2) && _hb_diff_fed(e1, e2));
 
-    // Check if a path (with 2 edges, in this case,) exists
+    // Check the transitive HB by seeing if a path
+    // (with 2 edges, in this case,) exists.
     define hb(e1, e2 : element_t) : boolean
     = exists (a, b, c : integer) :: elem(a) == e1 && elem(b) == e2 &&   // Link e1, e2 to the start and end of a path.
         _hb(elem(a), elem(b)) && _hb(elem(b), elem(c));                 // Check if a path between e1 and e2 exists.
