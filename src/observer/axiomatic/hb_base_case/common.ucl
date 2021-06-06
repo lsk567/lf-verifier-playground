@@ -22,6 +22,8 @@ module common {
     // Interval constructor
     define zero() : interval_t
     = {0, 0};
+    define startup() : interval_t
+    = zero();
     define mstep() : interval_t
     = {0, 1};
     define nsec(t : integer) : interval_t
@@ -81,7 +83,7 @@ module common {
     // Element IDs
     type id_t = enum {  
         NULL,           // NULL 
-        a1, a2, b1, b2  // Reactions
+        a1, b1, b2, b3  // Reactions
     };
 
     // The delay function
@@ -93,8 +95,9 @@ module common {
     /*****************
      * Trace Element *
      ****************/
-    type index_t = boolean;
-    type element_t = { index_t, id_t, tag_t };
+    // type index_t = boolean;
+    type value_t = boolean; 
+    type element_t = { id_t, value_t, tag_t };
     
     // Projection macros
     define id(e : element_t) : id_t     = e._1;

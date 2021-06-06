@@ -13,7 +13,7 @@ module main {
      
     // Mark the start of the trace.
     var start : timestamp_t;
-    assume(start >= 1000000000001);
+    assume(start == 0);
 
     // The trace of a1
     var trace : trace_t;
@@ -39,34 +39,39 @@ module main {
     // Return reaction priority.
     define priority(i : id_t) : integer
     = if (i == a1) then 1 else (
-        if (i == a2) then 2 else (
-            if (i == b1) then 1 else (
-                if (i == b2) then 2 else (
+        if (i == b1) then 1 else (
+            if (i == b2) then 2 else (
+                if (i == b3) then 3 else (
                     999))));
 
     // Return logical delay in a connection.
     define connection_delay(i1, i2 : id_t) : interval_t
-    = if (i1 == a2 && i2 == b2) then msec(1) else inf(); 
+    = if (i1 == a1 && i2 == b3) then msec(10) else inf(); 
 
     define _hb_same_fed(e1, e2 : element_t) : boolean
     = tag_earlier(g(e1), g(e2)) ||
         (tag_same(g(e1), g(e2)) && priority(id(e1)) < priority(id(e2)));
 
     define _hb_diff_fed(e1, e2 : element_t) : boolean
-    = tag_earlier(tag_delay(g(e1), connection_delay(id(e1), id(e2))))
-        || tag_same(tag_delay(g(e1), connection_delay(id(e1), id(e2))));
+    = tag_earlier(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2))
+        || tag_same(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2));
 
     define _hb(e1, e2 : element_t) : boolean
     =   // If two events belong to the same federate,
         // determine hb via tags.
-        (((id(e1) == a1 && id(e2) == a2)
-        || (id(e1) == a2 && id(e2) == a1)
+        // This is bi-directional.
+        (( (id(e1) == id(e2))
         || (id(e1) == b1 && id(e2) == b2)
-        || (id(e1) == b2 && id(e2) == b1))
+        || (id(e1) == b2 && id(e2) == b1)
+        || (id(e1) == b1 && id(e2) == b3)
+        || (id(e1) == b3 && id(e2) == b1)
+        || (id(e1) == b2 && id(e2) == b3)
+        || (id(e1) == b3 && id(e2) == b2))
             ==> _hb_same_fed(e1, e2))
         // If two events belong to different federates,
         // check if a connection is present.
-        && (((id(e1) == a2 && id(e2) == b2))
+        // This is uni-directional.
+        && (((id(e1) == a1 && id(e2) == b3))
             ==> _hb_diff_fed(e1, e2));
 
     // Check if a path (with 2 edges, in this case,) exists
@@ -94,7 +99,25 @@ module main {
 
     define last(e : element_t) : boolean
     = !(exists (i : integer) :: in_range(i) && id(elem(i)) == id(e) && tag_later(g(elem(i)), g(e))); 
+
+    define is_triggered_by_startup(_id : id_t) : boolean
+    = // If startup is within frame, put the events in the trace.
+    ((start == 0) ==> (exists (i : integer) :: in_range(i)
+        && id(elem(i)) == _id && tag_same(g(elem(i)), startup())))
+    // Can only appear once.
+    && !(exists (j : integer) :: in_range(j) && id(elem(j)) == _id
+        && !tag_same(g(elem(j)), startup()));
     
+    define is_triggered_by(downstream, upstream : id_t, delay : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    );
+
+    define is_in_trace(_id : id_t) : boolean
+    = (exists (i : integer) :: in_range(i) && id(elem(i)) == _id);
+
     /**********
      * Axioms *
      **********/
@@ -112,19 +135,17 @@ module main {
         ==> ((id(elem(i)) == id(elem(j)) && i != j)
             ==> !tag_same(g(elem(i)), g(elem(j)))));
 
-    /*
     // NULL events should appear in the suffix
     axiom(forall (j : integer) :: in_range(j) ==> (
         (id(elem(j)) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
         ((i < j) ==> id(elem(i)) != NULL)
     )));
-    */
 
-    // The trace should not have NULL events
-    axiom(forall (i : integer) :: in_range(i)
-        ==> !isNULL(elem(i)));
+    // [Only for timers] The trace should not have NULL events
+    // axiom(forall (i : integer) :: in_range(i)
+    //     ==> !isNULL(elem(i)));
     
-    // [Updated] All tags should be positive
+    // All tags should be positive
     axiom(forall (i : integer) :: in_range(i) ==> (
         pi1(g(elem(i))) >= 0
     ));
@@ -133,53 +154,41 @@ module main {
     axiom(forall (i : integer) :: tag_same(g(elem(i)), {start, 0})
         || tag_later(g(elem(i)), {start, 0}));
     
-    // Each reaction should have a preceding reaction that triggered it.
+    // [Important] The trace should respect the HB relation.
+    // axiom(forall (i, j : integer) :: hb(elem(i), elem(j))
+    //     ==> i < j);
 
-    // 1. start the firing at the first valid instant closest to the start.
-    // axiom(is_closest_starting_point(g(elem(0)), pi1(msec(10)), pi1(msec(20))));
+    /*******************************
+     * Application-specific axioms *
+     *******************************/
+    // a1 triggered by startup.
+    axiom(is_triggered_by_startup(a1));
 
-    // 2. each subsequent firing is separated by the period.
-    // (FIXME: Need to finish.)
-    /*
-    axiom(forall (i : integer) :: in_range(i)
-        ==> (
-            // (first(elem(i)) ==> is_closest_starting_point(g(elem(i)), pi1(msec(10)), pi1(msec(20))))
-            // (i == 0 ==> is_closest_starting_point(g(elem(i)), pi1(msec(10)), pi1(msec(20))))
-            // && (!first(elem(i)) ==> (g(elem(i)) == tag_schedule(g(elem(i-1)), msec(10))))
-        ));
-    */
+    // b1 triggered by startup.
+    axiom(is_triggered_by_startup(b1));
 
-    /*    
-    // Each reaction should have a preceding reaction that triggered it.
+    // b2 is triggered by the logical action scheduled by b1.
+    axiom(is_triggered_by(b2, b1, msec(9)));
 
-    // 1. start the firing at the first valid instant closest to the start.
-    axiom(is_closest_starting_point(g(elem_a2(0)), pi1(msec(10)), 0));
+    // b3 is triggered by a1 with logical delay of 10 msec.
+    axiom(is_triggered_by(b3, a1, msec(10)));
 
-    // 2. each subsequent firing is separated by the period.
-    axiom(forall (i : integer) :: (in_range(i) && i > 0)
-        ==> (g(elem_a2(i)) == tag_schedule(g(elem_a2(i-1)), msec(10))));
+     
+    // [placeholder] Add user-defined properties here.
+    property test : !(is_in_trace(b3) && is_in_trace(b2));
 
-
-    
-    // Each reaction should have a preceding reaction that triggered it.
-
-    // 1. start the firing at the first valid instant closest to the start.
-    axiom(is_closest_starting_point(g(elem_b1(0)), pi1(msec(12)), 0));
-
-    // 2. each subsequent firing is separated by the period.
-    axiom(forall (i : integer) :: (in_range(i) && i > 0)
-        ==> (g(elem_b1(i)) == tag_schedule(g(elem_b1(i-1)), msec(12))));
-
-
-
-    // For every invocation of b2, there needs to be an instance of a2 upstream.
-    axiom(forall (i : integer) :: !isNULL(elem_b2(i))
-        ==> (exists (j : integer) :: !isNULL(elem_a2(j))
-            && g(elem_b2(i)) == tag_delay(g(elem_a2(j)), msec(1))
-        )
-    );
-    */
-
+    // property test : false;
+     
+    //////////////////////////////////////////////////
+     
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex;
+    }
+     
+}
 
     /**************
      * Backburner *
@@ -199,19 +208,3 @@ module main {
     // Display simulatenous elements in order of priority
      
     // Startup should only appears once in each reactor
-     
-    // [placeholder] Add user-defined properties here.
-    // property test : !(exists (i : integer) :: in_range(i) && id(elem_a1(i)) == a1);
-
-    property test : false;
-     
-    //////////////////////////////////////////////////
-     
-    control {
-        v = unroll(0);
-        check;
-        print_results;
-        v.print_cex;
-    }
-     
-}
