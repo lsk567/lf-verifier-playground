@@ -96,13 +96,15 @@ module common {
      * Trace Element *
      ****************/
     // type index_t = boolean;
-    type value_t = boolean; 
-    type element_t = { id_t, value_t, tag_t };
+    // type value_t = boolean; 
+    // type element_t = { id_t, value_t, tag_t };
+    type element_t = { id_t, tag_t };
     
     // Projection macros
     define id(e : element_t) : id_t     = e._1;
-    define val(e : element_t) : value_t = e._2;
-    define g(e : element_t) : tag_t     = e._3;
+    // define val(e : element_t) : value_t = e._2;
+    // define g(e : element_t) : tag_t     = e._3;
+    define g(e : element_t) : tag_t     = e._2;
 
     define isNULL(e : element_t) : boolean = id(e) == NULL;
      
@@ -140,7 +142,8 @@ module common {
                                 if (i == 7) then tr._8 else (
                                     if (i == 8) then tr._9 else (
                                         if (i == 9) then tr._10 else (
-                                            { NULL, false, inf() }
+                                            // { NULL, false, inf() }
+                                            { NULL, inf() }
                                         )
                                     )
                                 )

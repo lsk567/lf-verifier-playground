@@ -1,9 +1,10 @@
 /**
  * A manually written model exploring the following concepts:
  * 1. A good set of timer-related axioms
- * 1. (TODO) Individual trace variable for each component with a starting point.
- * 2. (TODO) a HB definition consistent with Lamport's def.
- * 3. (TODO) a full-blown three timers example that illustrate frames of reference.
+ * -. (Deprecated) Individual trace variable for each component with a starting point.
+ * 2. a HB definition consistent with Lamport's def.
+ * 3. a base case example that illustrate frames of reference.
+ * 4. (TODO) Use nondeterministic variable with axiom to model the set of logical delays.
  */
 module main {
  
@@ -27,15 +28,15 @@ module main {
      *******************************/
     // Original:
     // hb(a,b) := g(a) + min(sum(max(edge_weight))) <= g(b)
-
     // Now taking a path-based approach.
     // Lamport: hb(a,b) := exists (p : path) :: reach(a, path) == b;
-
+    // 
     // Check individual hb edges:
     // 1. If two invocations are in the same federate, compare tags directly.
     // 2. If two invocations belong to different federates, check if there exists
     //      a connection with a logical delay.
 
+    /* Topology */
     // Return reaction priority.
     define priority(i : id_t) : integer
     = if (i == a1) then 1 else (
@@ -47,6 +48,11 @@ module main {
     // Return logical delay in a connection.
     define connection_delay(i1, i2 : id_t) : interval_t
     = if (i1 == a1 && i2 == b3) then msec(10) else inf(); 
+
+    // Return logical delay in a connection.
+    define logical_action_delay(i1, i2 : id_t) : interval_t
+    = if (i1 == b1 && i2 == b2) then msec(9) else inf(); 
+    //////////////
 
     // Return true if two events occur on the same federate.
     define _id_same_fed(e1, e2 : element_t) : boolean
@@ -66,37 +72,60 @@ module main {
     // by comparing the tags and the priorities of the two events.
     //
     // TODO: account for nested reactors in federates.
-    define _hb_same_fed(e1, e2 : element_t) : boolean
-    = tag_earlier(g(e1), g(e2)) ||
-        (tag_same(g(e1), g(e2)) && priority(id(e1)) < priority(id(e2)));
+    define _hb_same_fed(__e1, __e2 : element_t) : boolean
+    = tag_earlier(g(__e1), g(__e2)) ||
+        (tag_same(g(__e1), g(__e2)) && priority(id(__e1)) < priority(id(__e2)));
 
     // Return true if e1 happened before e2 in different federates
     // and e1 has a connection to e2. This check uses the time tags
     // and the logical delay in the connection.
     //
     // FIXME: account for physical connections.
-    define _hb_diff_fed(e1, e2 : element_t) : boolean
-    = tag_earlier(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2))
-        || tag_same(tag_delay(g(e1), connection_delay(id(e1), id(e2))), g(e2));
+    define _hb_diff_fed(___e1, ___e2 : element_t) : boolean
+    = tag_earlier(tag_delay(g(___e1), connection_delay(id(___e1), id(___e2))), g(___e2))
+        || tag_same(tag_delay(g(___e1), connection_delay(id(___e1), id(___e2))), g(___e2));
 
     // Check the happened-before relation between two immediate events.
-    define _hb(e1, e2 : element_t) : boolean
+    define _hb(_e1, _e2 : element_t) : boolean
     =   // If two events belong to the same federate,
         // determine hb via tags.
         // This is bi-directional.
-        (_id_same_fed(e1, e2) && _hb_same_fed(e1, e2))
+        (_id_same_fed(_e1, _e2) && _hb_same_fed(_e1, _e2))
         // If two events belong to different federates,
         // check if a connection is present.
         // This is uni-directional.
-        || (_id_diff_fed(e1, e2) && _hb_diff_fed(e1, e2));
+        || (_id_diff_fed(_e1, _e2) && _hb_diff_fed(_e1, _e2));
 
-    // Check the transitive HB by seeing if a path
-    // (with 2 edges, in this case,) exists.
-    define hb(e1, e2 : element_t) : boolean
-    = exists (a, b, c : integer) :: elem(a) == e1 && elem(b) == e2 &&   // Link e1, e2 to the start and end of a path.
-        _hb(elem(a), elem(b)) && _hb(elem(b), elem(c));                 // Check if a path between e1 and e2 exists.
 
+    // HB path with 1 edge
+    define hb_1(e1, e2 : element_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b : integer) :: in_range(a) && in_range(b) 
+        // Check if a path between e1 and e2 exists.
+        && elem(a) == e1 && elem(b) == e2
+        && _hb(elem(a), elem(b))
+        && a < b; 
+
+    // HB path with 2 edges
+    define hb_2(e1, e2 : element_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c : integer) :: elem(a) == e1 && elem(c) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c))
+        && a < b && b < c;
     
+    // HB path with 3 edges
+    define hb_3(e1, e2 : element_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d : integer) :: elem(a) == e1 && elem(d) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && a < b && b < c && c < d;
+
+    // Transitive "happened-before" definition
+    define hb(e1, e2 : element_t) : boolean
+    = hb_1(e1, e2) || hb_2(e1, e2) || hb_3(e1, e2);
+
     /*****************
      * Helper Macros *
      *****************/
@@ -125,10 +154,25 @@ module main {
     && !(exists (j : integer) :: in_range(j) && id(elem(j)) == _id
         && !tag_same(g(elem(j)), startup()));
     
+    // This includes the possibility that upstream does NOT output.
     define is_triggered_by(downstream, upstream : id_t, delay : interval_t) : boolean
     = (forall (i : integer) :: in_range(i) ==>
         id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
             && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    );
+
+    // This macro ensures that the upstream MUST output.
+    define is_definitely_triggered_by(downstream, upstream : id_t,
+        delay : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    ) && 
+    (forall (j : integer) :: in_range(j) ==>
+        id(elem(j)) == upstream ==> (exists (i : integer) :: in_range(i)
+            && id(elem(i)) == downstream 
             && g(elem(i)) == tag_schedule(g(elem(j)), delay))
     );
 
@@ -138,11 +182,25 @@ module main {
     /**********
      * Axioms *
      **********/
+    // [Not true in multi-observer. Should disable and use HB.] 
     // Display trace in timestamp order
-    axiom(forall (i, j : integer) :: (i < j && in_range(i) && in_range(j)) 
-        ==> (tag_earlier(g(elem(i)), g(elem(j)))
-            || tag_same(g(elem(i)), g(elem(j)))));
+    // axiom(forall (i, j : integer) :: (i < j && in_range(i) && in_range(j)) 
+    //     ==> (tag_earlier(g(elem(i)), g(elem(j)))
+    //         || tag_same(g(elem(i)), g(elem(j)))));
     
+    // [Important] The trace should respect the HB relation.
+    // In this case, there is no constraint on i, j when hb
+    // fails to establish on both direction (def. of concurrent).
+    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> (((_hb(elem(i), elem(j)) && !_hb(elem(j), elem(i))) ==> i < j) ));
+    
+    // TODO: The following is NOT okay. Why is that? The a < b constraint seems
+    //  to break it down. Need to internalize.
+    // axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+    //     ==> (((hb(elem(i), elem(j)) && !hb(elem(j), elem(i))) ==> i < j) ));
+
+    // TODO: Sanity check: there does not exist two-way HB.
+
     // All microsteps are positive
     axiom(forall (i : integer) :: in_range(i)
         ==> pi2(g(elem(i))) >= 0);
@@ -171,11 +229,6 @@ module main {
     axiom(forall (i : integer) :: tag_same(g(elem(i)), {start, 0})
         || tag_later(g(elem(i)), {start, 0}));
     
-    // [Important] The trace should respect the HB relation.
-    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
-        ==> (hb(elem(i), elem(j))
-        ==> i < j));
-
     /*******************************
      * Application-specific axioms *
      *******************************/
@@ -186,16 +239,89 @@ module main {
     axiom(is_triggered_by_startup(b1));
 
     // b2 is triggered by the logical action scheduled by b1.
-    axiom(is_triggered_by(b2, b1, msec(9)));
+    axiom(is_triggered_by(b2, b1, logical_action_delay(b1, b2)));
 
     // b3 is triggered by a1 with logical delay of 10 msec.
-    axiom(is_triggered_by(b3, a1, msec(10)));
+    axiom(is_definitely_triggered_by(b3, a1, connection_delay(a1, b3)));
 
-     
-    // [placeholder] Add user-defined properties here.
-    property test : !(is_in_trace(b3) && is_in_trace(b2));
+    /* Debugging HB */
 
+    // Test case 1:
+    // Assuming logical action's min_delay is 11 msec.
+    // Setting variables in trace for debugging.
+    // axiom(elem(2) == {b3, msec(10)} && elem(3) == {b2, msec(11)});
+    // property hb_test2 : hb({b2, msec(11)}, {b3, msec(10)});
+
+    // Test case 2:
+    // Property: an observer can see b2 happening before b3. 
+    // property hb_test : id(elem(2)) == b2 && id(elem(3)) == b3;
+
+    // Test case 3:
+    // Issue: hb is not established for cross-federate invocations.
+    //      1. When hb fails to establish, the i < j constraint is not
+    //      enforced currently. This is wrong. The constraint should
+    //      only enforce when (a !< b /\ b !< a).
+    //      2. The hb axiom (labeled "important") uses hb() instead of _hb().
+    //      The transitive version seems to mess things up.
+    //
+    //
+    // axiom(elem(1) == {b3, msec(10)} && elem(2) == {a1, zero()});
+    // Dummy property is enough to test when the important hb axiom is enabled.
+    // The above axiom describes an impossible case. There should be no valid traces
+    // that satisfy it.
     // property test : false;
+    // Backup properties:
+    // property diff_fed_test : _hb({b3, msec(10)}, {a1, zero()}); 
+    // property test__hb : _hb({a1, zero()}, {b3, msec(10)}) && !_hb({b3, msec(10)}, {a1, zero()});
+    // property test_hb : !hb({a1, zero()}, {b3, msec(10)}) && !hb({b3, msec(10)}, {a1, zero()});
+     
+    // Test case 4 (reverse of case 3):
+    // Remarl: this shows that {a1, zero()} < {b3, msec(10)} is valid.
+    // axiom(elem(1) == {a1, zero()} && elem(2) == {b3, msec(10)});
+    // property diff_fed_test : (_id_diff_fed({a1, zero()}, {b3, msec(10)})
+    //     && _hb_diff_fed({a1, zero()}, {b3, msec(10)})); 
+
+    // Test case 5: multi-edge HB path
+    // Assuming min_delay is 11.
+    //
+    // Note: elem indices need to be carefully chosen.
+    // Here we need to leave a space for {b1, zero()}.
+    // axiom(elem(0) == {a1, zero()} 
+    //     && elem(2) == {b3, msec(10)} 
+    //     && elem(3) == {b2, msec(11)});
+    // property test_if_valid_trace : false;
+    // If hb_2_edge does not return CEX, then it is correct, otherwise false.
+    // property test_multi_edge_hb_path : hb_2({a1, zero()}, {b2, msec(11)});
+    // If hb_1_edge returns CEX, then it is correct, otherwise false.
+    // property test_single_edge_hb_path : hb_1({a1, zero()}, {b2, msec(11)});
+    // Testing general HB def.
+    // property test_hb : hb({a1, zero()}, {b2, msec(11)});
+    // property test2_hb : hb({b3, msec(10)}, {b2, msec(11)});
+
+    // Test case 6: extend test case 5.
+    // Note!: If logical delay is set to msec(9) or msec(10), expect the following to fail.
+    //          Expect it to pass if logical delay set to msec(11).
+    /*
+    axiom(elem(0) == {a1, zero()} 
+        && elem(2) == {b3, msec(10)} 
+        && elem(3) == {b2, msec(11)}); // <= Adjust this value and its position too.
+    */
+    // property check_trace_exists : false;
+    // property test3_hb : hb({a1, zero()}, {b2, msec(11)});
+
+    /**************
+     * Properties *
+     **************/
+
+    // Property: trivial.
+    // property test : false;
+
+    // Check if a1 always happened before b2.
+    // Remark: when logical delay set to msec(11), the counterexample is very interesting!
+    // When a1 does not produce output, a1 does not happen before b2, which is CORRECT.
+    property a1_hb_b2 : forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> ((id(elem(i)) == a1 && id(elem(j)) == b2)
+            ==> hb(elem(i), elem(j)));
      
     //////////////////////////////////////////////////
      
@@ -208,21 +334,21 @@ module main {
      
 }
 
-    /**************
-     * Backburner *
-     **************/
-    /*
-    // first & last in trace_t1
-    define first(e : element_t) : boolean
-    = !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_earlier(g(elem_t1(i)), g(e))); 
+/*********************
+ * Backburner axioms *
+ *********************/
+/*
+// first & last in trace_t1
+define first(e : element_t) : boolean
+= !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_earlier(g(elem_t1(i)), g(e))); 
 
-    define last(e : element_t) : boolean
-    = !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_later(g(elem_t1(i)), g(e))); 
-    */
+define last(e : element_t) : boolean
+= !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_later(g(elem_t1(i)), g(e))); 
+*/
 
-    // (Might not be a good thing to have, since we want to check unbounded props.)
-    // First invocation of A2 should start at 2 ms.
+// (Might not be a good thing to have, since we want to check unbounded props.)
+// First invocation of A2 should start at 2 ms.
 
-    // Display simulatenous elements in order of priority
-     
-    // Startup should only appears once in each reactor
+// Display simulatenous elements in order of priority
+ 
+// Startup should only appears once in each reactor
