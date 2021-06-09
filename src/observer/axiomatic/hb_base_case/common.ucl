@@ -13,6 +13,7 @@ module common {
         timestamp_t,
         microstep_t
     };
+    // FIXME: in LF, the interval is an integer.
     type interval_t  = tag_t;
     
     // Projection macros

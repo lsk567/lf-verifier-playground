@@ -97,6 +97,7 @@ module main {
         || (_id_diff_fed(_e1, _e2) && _hb_diff_fed(_e1, _e2));
 
 
+    // FIXME: Is there a way to generate more customized model?
     // HB path with 1 edge
     define hb_1(e1, e2 : element_t) : boolean
     // Link e1, e2 to the start and end of a path.
@@ -319,9 +320,19 @@ module main {
     // Check if a1 always happened before b2.
     // Remark: when logical delay set to msec(11), the counterexample is very interesting!
     // When a1 does not produce output, a1 does not happen before b2, which is CORRECT.
+    //
+    // In practice, HB might not be used for formulating properties.
+    // An internal tool. The counterexample does not show an offending trace.
+    /*
     property a1_hb_b2 : forall (i, j : integer) :: (in_range(i) && in_range(j))
         ==> ((id(elem(i)) == a1 && id(elem(j)) == b2)
             ==> hb(elem(i), elem(j)));
+    */
+
+    // This shows an actual offending frame of reference.
+    property a1_appears_before_b2 : forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> ((id(elem(i)) == a1 && id(elem(j)) == b2)
+            ==> i < j);
      
     //////////////////////////////////////////////////
      
