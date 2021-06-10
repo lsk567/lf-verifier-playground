@@ -168,23 +168,37 @@ module main {
     && !(exists (j : integer) :: in_range(j) && id(elem(j)) == _id
         && !tag_same(g(elem(j)), startup()));
 
+    // Can directly use index as HB since this only applies to events
+    // on the same federate.
+    define _is_latest_invocation_in_same_fed_wrt_(a, b : integer) : boolean
+    = !(exists (c : integer) :: in_range(c) 
+        && id(elem(c)) == id(elem(a)) && a < c && c < b);
+
     define is_triggered_by_timer(_id : id_t) : boolean
-    = // If the initial event is within frame, show it.
+    =   // 1. If the initial event is within frame, show it.
         (exists (i : integer) :: in_range(i)
         && id(elem(i)) == _id
         && is_closest_starting_point(g(elem(i)), pi1(timer_period(_id)),
             pi1(timer_offset(_id))))
-        // Each invocation implies a subsequent invocation
-        // && (forall (j : integer) :: (in_range(j) && j <= END - NUM_TIMERS) ==>
-        //     id(elem(j)) == _id ==> (exists (k : integer) :: in_range(k)
-        //         && id(elem(k)) == _id
-        //         && g(elem(k)) == tag_schedule(g(elem(j)), timer_period(_id))));
-        // The SPACING between two consecutive timers is the period.
+        // 2. The SPACING between two consecutive timers is the period.
         && (forall (i, j : integer) :: (in_range(i) && in_range(j) && i < j
             && id(elem(i)) == _id && id(elem(j)) == _id
             // ...and there does not exist a 3rd invocation in between
             && !(exists (k : integer) :: id(elem(k)) == _id && i < k && k < j))
-                ==> g(elem(j)) == tag_schedule(g(elem(i)), timer_period(_id)));
+                ==> g(elem(j)) == tag_schedule(g(elem(i)), timer_period(_id)))
+        // 3. There does not exist other events in the same federate that 
+        // differ by the last timer invocation by g(last_timer) + period.
+        // In other words, this axiom ensures a timer fires when it needs to.
+        //
+        // a := index of the offending event that occupy the spot of a timer tick.
+        // b := index of non-timer event on the same federate
+        // both in_range's are needed due to !(exists), which turns into a forall.
+        && !(exists (b, a : integer) :: in_range(a) && in_range(b)
+            && id(elem(b)) != _id
+            && _id_same_fed(elem(b), {_id, zero()})
+            && id(elem(a)) == _id
+            && (_is_latest_invocation_in_same_fed_wrt_(a, b)
+                && tag_later(g(elem(b)), tag_schedule(g(elem(a)), timer_period(_id))) ));
     
     // This includes the possibility that upstream does NOT output.
     define is_triggered_by(downstream, upstream : id_t, delay : interval_t) : boolean
@@ -267,17 +281,18 @@ module main {
     axiom(is_triggered_by_timer(a2));
 
     // b1 is triggered by timer.
-    axiom(is_triggered_by_timer(b1));
+    // axiom(is_triggered_by_timer(b1));
 
     // b2 is triggered by a1 with logical delay of 1 msec.
     // axiom(is_definitely_triggered_by(b2, a1, connection_delay(a1, b2)));
 
     /* Debugging HB */
 
-    // Test case 1: testing timers are working
-    // axiom(elem(2) == {b3, msec(10)} && elem(3) == {b2, msec(11)});
-    // property hb_test2 : hb({b2, msec(11)}, {b3, msec(10)});
-
+    // Test case 1: testing whether timers are working.
+    // No NULL events or b2 or b1
+    axiom(forall (i : integer) :: in_range(i) ==>
+        (id(elem(i)) != NULL && id(elem(i)) != b2 && id(elem(i)) != b1)); 
+    property trivial : false;
 
 
 
@@ -286,7 +301,7 @@ module main {
      **************/
 
     // Property: trivial.
-    property test : false;
+    // property test : false;
 
     // Check if a1 always happened before b2.
     // Remark: when logical delay set to msec(11), the counterexample is very interesting!
