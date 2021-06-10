@@ -281,18 +281,24 @@ module main {
     axiom(is_triggered_by_timer(a2));
 
     // b1 is triggered by timer.
-    // axiom(is_triggered_by_timer(b1));
+    axiom(is_triggered_by_timer(b1));
 
     // b2 is triggered by a1 with logical delay of 1 msec.
-    // axiom(is_definitely_triggered_by(b2, a1, connection_delay(a1, b2)));
+    axiom(is_definitely_triggered_by(b2, a2, connection_delay(a2, b2)));
 
     /* Debugging HB */
 
     // Test case 1: testing whether timers are working.
-    // No NULL events or b2 or b1
-    axiom(forall (i : integer) :: in_range(i) ==>
-        (id(elem(i)) != NULL && id(elem(i)) != b2 && id(elem(i)) != b1)); 
-    property trivial : false;
+    // Disable certain events. Make sure this matches with the application-specific axioms.
+    axiom(forall (i : integer) :: in_range(i) ==> (
+        id(elem(i)) != NULL
+        // && id(elem(i)) != b2 
+        // && id(elem(i)) != b1
+    )); 
+    // property trivial : false;
+    // property b2_in_trace : !(exists (i : integer) :: id(elem(i)) == b2);
+    property two_b2_in_trace : !(exists (i, j : integer) :: id(elem(i)) == b2
+        && id(elem(j)) == b2 && i != j);
 
 
 
