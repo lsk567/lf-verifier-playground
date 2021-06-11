@@ -1,10 +1,12 @@
 /**
+ * Parallel Timers
+ *
  * A manually written model exploring the following concepts:
- * 1. A good set of timer-related axioms
- * -. (Deprecated) Individual trace variable for each component with a starting point.
- * 2. a HB definition consistent with Lamport's def.
- * 3. a base case example that illustrate frames of reference.
- * 4. (TODO) Use nondeterministic variable with axiom to model the set of logical delays.
+ * 1. A set of timer-related axioms
+ * 2. An HB definition consistent with Lamport's def.
+ * 3. A "parallel timers" example that illustrate multiple frames of reference.
+ * 4. (TODO, NA in this exampler) Use nondeterministic variable with axioms
+ *      to model the set of logical delays.
  */
 module main {
  
@@ -14,7 +16,7 @@ module main {
      
     // Mark the start of the trace.
     var start : timestamp_t;
-    assume(start == pi1(msec(103)));
+    assume(start == pi1(zero()));
 
     // The trace of a1
     var trace : trace_t;
@@ -290,16 +292,15 @@ module main {
 
     // Test case 1: testing whether timers are working.
     // Disable certain events. Make sure this matches with the application-specific axioms.
-    axiom(forall (i : integer) :: in_range(i) ==> (
-        id(elem(i)) != NULL
+    // axiom(forall (i : integer) :: in_range(i) ==> (
+        // id(elem(i)) != NULL
         // && id(elem(i)) != b2 
         // && id(elem(i)) != b1
-    )); 
+    // )); 
     // property trivial : false;
     // property b2_in_trace : !(exists (i : integer) :: id(elem(i)) == b2);
-    property two_b2_in_trace : !(exists (i, j : integer) :: id(elem(i)) == b2
-        && id(elem(j)) == b2 && i != j);
-
+    // property two_b2_in_trace : !(exists (i, j : integer) :: id(elem(i)) == b2
+    //     && id(elem(j)) == b2 && i != j);
 
 
     /**************
@@ -327,6 +328,66 @@ module main {
         ==> ((id(elem(i)) == a1 && id(elem(j)) == b2)
             ==> i < j);
     */
+    
+    /* LTL Properties */
+    // Case 1: p
+    // define p(e : element_t) : boolean
+    // = id(e) == a1;
+    // define p(e : element_t) : boolean
+    // = id(e) != NULL; // Is not an empty trace.
+    // property prop : p(elem(0));
+    
+    // Case 2: X(p)
+    // define p(e : element_t) : boolean
+    // = id(e) == a1;
+    // property prop : p(elem(1));
+
+    // Case 3: X(X(p))
+    // define p(e : element_t) : boolean
+    // = id(e) == a1;
+    // property prop : p(elem(2));
+
+    // Case 4: U(p, q) operator
+    // p: not b2.
+    // q: yes b2.
+    // U_p_q: not b2 UNTIL yes b2. Expected no CEX.
+    /*
+    define p5(e : element_t) : boolean
+    = id(e) != b2;
+    define q5(e : element_t) : boolean
+    = id(e) == b2;
+    define U_p5_q5() : boolean
+    = exists (i : integer) :: in_range(i) && q5(elem(i))
+        && (forall (j : integer) :: (0 <= j && j < i)
+            ==> p5(elem(j)));
+    property prop: U_p5_q5();
+    */
+
+    // Case 6: U(p, q) operator with CEX
+    // p: not b2
+    // q: time after 20 msec
+    /*
+    define p6(e : element_t) : boolean
+    = id(e) != b2;
+    define q6(e : element_t) : boolean
+    = tag_later(g(e), msec(20));
+    define U6() : boolean
+    = exists (i : integer) :: in_range(i) && q6(elem(i))
+        && (forall (j : integer) :: (0 <= j && j < i)
+            ==> p6(elem(j)));
+    property prop: U6();
+    */
+
+    // Case 7: G(). Globally cannot observe consecutive a1.
+    // G((id == a1) ==> X(id != a1))
+    define p7(e : element_t) : boolean
+    = id(e) == a1;
+    define q7(e : element_t) : boolean
+    = id(e) != a1;
+    define G7() : boolean
+    = forall (i : integer) :: (in_range(i) && i <= (END - 1)) //
+        ==> (p7(elem(i)) ==> q7(elem(i+1)));
+    property prop : G7();
      
     //////////////////////////////////////////////////
      
@@ -338,22 +399,3 @@ module main {
     }
      
 }
-
-/*********************
- * Backburner axioms *
- *********************/
-/*
-// first & last in trace_t1
-define first(e : element_t) : boolean
-= !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_earlier(g(elem_t1(i)), g(e))); 
-
-define last(e : element_t) : boolean
-= !(exists (i : integer) :: id(elem_t1(i)) == id(e) && tag_later(g(elem_t1(i)), g(e))); 
-*/
-
-// (Might not be a good thing to have, since we want to check unbounded props.)
-// First invocation of A2 should start at 2 ms.
-
-// Display simulatenous elements in order of priority
- 
-// Startup should only appears once in each reactor
