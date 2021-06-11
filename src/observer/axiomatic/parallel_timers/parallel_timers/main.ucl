@@ -380,6 +380,7 @@ module main {
 
     // Case 7: G(). Globally cannot observe consecutive a1.
     // G((id == a1) ==> X(id != a1))
+    /*
     define p7(e : element_t) : boolean
     = id(e) == a1;
     define q7(e : element_t) : boolean
@@ -388,6 +389,17 @@ module main {
     = forall (i : integer) :: (in_range(i) && i <= (END - 1)) //
         ==> (p7(elem(i)) ==> q7(elem(i+1)));
     property prop : G7();
+    */
+
+    // Case 8: Testing F().
+    // F(b2)
+    // b2 eventually occurs.
+    define p8(e : element_t) : boolean
+    = id(e) == b2;
+    define F8() : boolean
+    = exists (i : integer) :: (in_range(i) && i >= 0) // i >= 0 defines temporal modality. 
+        && p8(elem(i));
+    property prop : F8();
      
     //////////////////////////////////////////////////
      
