@@ -1,0 +1,46 @@
+target C {
+    threads: 1,
+    keepalive: true
+};
+
+reactor Controller {
+    
+    output out:bool;
+    
+    reaction(startup) -> out {=        
+        bool v = true;
+        SET(out, v);
+    =}
+}
+
+reactor Vision {
+    
+    input _in:bool;
+    output out:bool;
+    state ramp_exists:bool(false);
+    
+    reaction(_in) -> out {=
+        if (self->ramp_exists) {
+            SET(out, _in->value);
+        }
+    =}
+}
+
+reactor Door {
+    
+    input _in:bool;
+    state door:bool;
+    
+    reaction(_in) {=
+        self->door = _in->value;
+    =}
+}
+
+main reactor AircraftDoor {
+    
+    controller	= new Controller();
+    vision		= new Vision();
+    door		= new Door();
+    controller.out -> vision._in;
+    vision.out -> door._in;
+}

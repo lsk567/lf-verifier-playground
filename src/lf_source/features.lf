@@ -1,0 +1,60 @@
+target C;
+
+reactor A {
+    
+    input _in:int;
+    
+    output out1:int;
+    output out2:int;
+    
+    logical action act;
+    
+    reaction(startup) -> out1 {=
+    	
+    =}
+    
+    reaction(_in) -> out2 {=
+        
+    =}
+    
+    reaction(_in, act) -> act {=
+        
+    =}
+}
+
+reactor B {
+    
+    input _in:int;
+    output out:int;
+    
+    timer t;
+    
+    reaction(t) {=
+        
+    =}
+    
+    reaction(_in) -> out {=
+        
+    =}
+    
+    reaction(shutdown) {=
+        
+    =}
+}
+
+reactor C {
+    
+    output out1:int;
+    output out2:int;
+    
+    a = new A();
+    b = new B();
+    
+    a.out1 -> a._in;
+    a.out2 -> b._in;
+    b.out -> out1;
+    
+    reaction(a.out2) -> out2 {=
+        
+    =}
+}

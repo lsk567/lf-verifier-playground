@@ -1,0 +1,63 @@
+target C;
+
+reactor Vehicle {
+	
+	input grant:bool;
+    
+    output done:bool;
+    output request:bool;
+    
+    physical action arrive;
+    logical action finish;
+    
+    reaction(arrive) -> request {=
+        SET(arrive, true);
+    =}
+    
+    reaction(grant) -> finish {=
+        info_print("Vehicle %d enters the intersection.", self->bank_index);
+        sleep(2); // Using the intersection.
+        schedule(finish, 0);
+    =}
+    
+    reaction(finish) -> done {=
+        SET(done, true);
+        info_print("Vehicle %d leaves the intersection.", self->bank_index);
+    =}
+}
+
+reactor RSU (
+    num_vehicles:int(4)
+) {
+    
+    input[num_vehicles] request:bool;
+    input[num_vehicles] done:bool;
+    output[num_vehicles] grant:bool;
+    
+    state occupied:bool;
+    state last_grant:time;
+    
+    reaction(request) -> grant {=
+        for (int i = 0; i < self->num_vehicles; i++) {
+			if (request[i].is_present) {
+                SET(request[i], true);
+            }
+        }
+    =}
+    
+    reaction(done) {=
+        ... RSU is notified.
+    =}
+}
+
+main reactor (
+    num_vehicles:int(4)
+) {
+    
+    vehicles = new[num_vehicles] Vehicle();
+    rsu = new RSU(num_vehicles=num_vehicles);
+    
+    vehicles.request -> rsu.request;
+    vehicles.done -> rsu.done;
+    rsu.grant -> vehicles.grant;
+}

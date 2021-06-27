@@ -1,0 +1,55 @@
+target C;
+
+reactor A {
+    
+    input _in:int;
+    output out:int;
+    logical action act;
+    
+    reaction(_in) -> act {=
+        // Do something
+    =}
+    
+    reaction(act) -> out {=
+        // Do something
+    =}
+}
+
+reactor C {
+    
+    input _in:int;
+    output out:int;
+    
+    reaction(_in) -> out {=
+        // Do something
+    =}
+}
+
+reactor B {
+    
+    input _in1:int;
+    input _in2:int;
+    
+    reaction(_in1) {=
+        // Do something
+    =}
+    
+    reaction(_in2) {=
+        // Do something
+    =}
+}
+
+reactor Composite {
+    
+    input _in1:int;
+    input _in2:int;
+    
+    a = new A();
+    b = new B();
+    c = new C();
+    
+    _in1 -> a._in;
+    _in2 -> c._in;
+    a.out -> b._in1 after 5 sec;
+    c.out -> b._in2 after 10 sec;
+}

@@ -1,0 +1,106 @@
+/**
+ * This is an example of the emergency system
+ * of a high-speed railway (bullet train, hyperloop, etc.).
+ * 
+ * Why train door?
+ * - Canonical CPS
+ * - Easy to compare to prior work
+ * - Timing critical
+ * 
+ * Properties:
+ * 1. Concurrency: door cannot be open until engine is turned off.
+ * 		To avoid this, there must be some status update from engine to door.
+ * 2. Timing / Synchronization: 10 msec needs to be added to the connection.
+ * 3. SafetyModule must be involved before opening door.
+ * 4. OpenDoor must arrive at the door component before 20 msec.
+ * 5. (Stale data?) 
+ */
+target C;
+
+reactor EmergencyDetector {
+    
+    output stop:bool;
+    
+    physical action emergency;
+    
+    // Contract:
+    // 1. Need to output.
+    reaction(emergency) -> stop {=
+        SET(stop, true);
+    =}
+}
+
+reactor Door {
+    
+    input open:bool;
+    
+    reaction(open) {=
+        info_print("The train door is open.");
+    =}
+}
+
+reactor Engine {
+    
+    input stop:bool;
+        
+    reaction(stop) {=
+        info_print("Stop the engine asynchronously.");
+    =}
+}
+
+// Requires modeling state var.
+reactor SafetyModule(
+    poll_period: time(1 msec)
+) {
+    
+    input stop:bool;
+    output open:bool;
+    
+    state emergency:bool(false);
+    state speed:int(0);
+    
+    timer speedometer(0, poll_period);
+    
+    logical action check_stop(poll_period);
+    
+    // Contracts
+    // 1. Write to the emergency state var
+    // 2. Only produce signal when both inputs
+    //		are present.
+    //
+    // When engine_off and stop are both present,
+    // this reaction schedules a logical action.
+    reaction(stop) -> check_stop {=
+        if (self->stop && self->engine_off) {
+            schedule(check_stop, 0);
+        }
+    =}
+    
+    reaction(speedometer) {=
+        info_print("Pulling from speedometer.");
+    =}
+    
+    // Contract
+    // 1. Does not guarantee output.
+    reaction(check_stop) -> check_stop, open {=
+        if (self->speed != 0) {
+            // Continue to check if train is not stationary yet.
+            schedule(check_stop, 0);
+        } else {
+            // If the train is not moving, send the "open door" signal.
+            SET(open, 0);
+        }
+    =}
+}
+
+main reactor {
+    
+    ed		= new EmergencyDetector();
+    door	= new Door();
+    engine	= new Engine();
+    safety	= new SafetyModule();
+    
+    ed.stop				-> engine.stop;
+    ed.stop				-> safety.stop; // Delay used to synchronize the lock signal with engine stop signal.
+    safety.open			-> door.open;
+}

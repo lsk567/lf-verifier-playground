@@ -11,6 +11,6 @@ reactor A {
     =}
 }
 
-main reactor Composition {
+main reactor {
 	a = new A();	
 } 

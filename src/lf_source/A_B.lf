@@ -16,7 +16,7 @@ reactor B {
 	=}
 }
 
-main reactor Composition {
+main reactor {
 	a = new A();
 	b = new B();
 	a._out -> b._in;

@@ -1,0 +1,43 @@
+target C {
+    timeout: 50 msec,
+    uclid-model: true
+};
+
+reactor A {
+    
+    output out:int;
+    
+    timer t1(0, 10 msec);
+    timer t2(2 msec, 10 msec);
+    
+    reaction(t1) {=
+        printf("***** Reaction A1 fired.\n");
+    =}
+    
+    reaction(t2) -> out {=
+        printf("***** Reaction A2 fired.\n");
+    =}
+}
+
+reactor B {
+    
+    input _in:int;
+    
+    timer t3(0, 12 msec);
+    
+    reaction(t3) {=
+        printf("***** Reaction B1 fired.\n");
+    =}
+    
+    reaction(_in) {=
+        printf("***** Reaction B2 fired.\n");
+    =}
+}
+
+main reactor {
+    
+    a = new A();
+    b = new B();
+    
+    a.out -> b._in after 1 msec;
+}
