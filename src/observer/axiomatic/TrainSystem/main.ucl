@@ -318,16 +318,16 @@ module main {
     axiom(is_definitely_triggered_by(train_1, controller_2, connection_delay(controller_2, train_1)));
      
     // [placeholder] Add user-defined properties here.
-    // Door does not occur (open) until train occurs (stops).
-    // G(U(!is_door, is_train))
+    // Train does not move until door locks.
+    // G(U(!is_train, is_door))
     define is_train(e : element_t) : boolean
     = id(e) == train_1;
     define is_door(e : element_t) : boolean
     = id(e) == door_1;
     define p(e : element_t) : boolean
-    = !is_door(e);
+    = !is_train(e);
     define q(e : element_t) : boolean
-    = is_train(e);
+    = is_door(e);
     
     // Strong Until
     define U(modality_idx : integer) : boolean
