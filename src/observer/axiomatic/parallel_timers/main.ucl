@@ -51,7 +51,7 @@ module main {
     define connection_delay(i1, i2 : id_t) : interval_t
     = if (i1 == a2 && i2 == b2) then msec(1) else inf(); 
 
-    // Return logical delay in a connection.
+    // Return logical delay in an action.
     define logical_action_delay(i1, i2 : id_t) : interval_t
     = if (i1 == b1 && i2 == b2) then msec(9) else inf(); 
 
@@ -69,7 +69,6 @@ module main {
         if (i == a2) then msec(2) else (
             if (i == b1) then zero() else (
                 inf())));
-    //////////////
 
     // Return true if two events occur on the same federate.
     define _id_same_fed(e1, e2 : element_t) : boolean
@@ -82,6 +81,7 @@ module main {
     // Return true if two events occur on different federates.
     define _id_diff_fed(e1, e2 : element_t) : boolean
     = (id(e1) == a2 && id(e2) == b2);
+    //////////////
 
     // Return true if e1 happened before e2 in the same federate,
     // by comparing the tags and the priorities of the two events.
