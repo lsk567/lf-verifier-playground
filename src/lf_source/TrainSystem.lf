@@ -41,7 +41,7 @@ reactor Door {
     =}
 }
 
-main reactor {
+federated reactor {
     
     controller = new Controller();
     door = new Door();
