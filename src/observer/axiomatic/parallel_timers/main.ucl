@@ -51,6 +51,9 @@ module main {
     define connection_delay(i1, i2 : id_t) : interval_t
     = if (i1 == a2 && i2 == b2) then msec(1) else inf(); 
 
+    // FIXME: This is somehow not used.
+    // Merge logical action delay into connection delay.
+    //
     // Return logical delay in an action.
     define logical_action_delay(i1, i2 : id_t) : interval_t
     = if (i1 == b1 && i2 == b2) then msec(9) else inf(); 
