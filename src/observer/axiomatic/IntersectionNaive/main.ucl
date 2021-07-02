@@ -77,8 +77,8 @@ module main {
         || (id(e1) == v1_1 && id(e2) == rsu_1)
         || (id(e1) == v2_3 && id(e2) == rsu_3)
         || (id(e1) == v2_1 && id(e2) == rsu_1)
-        || (id(e1) == rsu_2 && id(e2) == v1_1)
-        || (id(e1) == rsu_2 && id(e2) == v2_1);
+        || (id(e1) == rsu_2 && id(e2) == v1_2)
+        || (id(e1) == rsu_2 && id(e2) == v2_2);
 
     // Return true if e1 happened before e2 in the same federate,
     // by comparing the tags and the priorities of the two events.
@@ -283,6 +283,18 @@ module main {
             && g(elem(i)) == tag_schedule(g(elem(j)), delay))
     );
     
+    // A reaction is triggered by 2 inputs.
+    define is_triggered_by_2(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == down ==> (
+            (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up1 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+            || (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up2 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay2))
+    ));
+
     // This macro ensures that the upstream MUST output.
     define is_definitely_triggered_by(downstream, upstream : id_t,
         delay : interval_t) : boolean
@@ -337,18 +349,22 @@ module main {
     /*******************************
      * Application-specific axioms *
      *******************************/
-    /*
-    axiom(is_triggered_by_startup(controller_1));
-    axiom(is_triggered_by_physical_action(controller_2));
-    axiom(is_definitely_triggered_by(door_1, controller_2, logical_delay(controller_2, door_1)));
-    axiom(is_definitely_triggered_by(train_1, controller_2, logical_delay(controller_2, train_1)));
-
     axiom(is_triggered_by_physical_action(v1_1));
-    axiom();
-    */
+    axiom(is_triggered_by(v1_2, rsu_2, logical_delay(rsu_2, v1_2)));
+    axiom(is_triggered_by(v1_3, v1_2, logical_delay(v1_2, v1_3)));
+    axiom(is_triggered_by_physical_action(v2_1));
+    axiom(is_triggered_by(v2_2, rsu_2, logical_delay(rsu_2, v2_2)));
+    axiom(is_triggered_by(v2_3, v2_2, logical_delay(v2_2, v2_3)));
+    axiom(is_triggered_by_2(rsu_1, v1_1, v2_1, logical_delay(v1_1, rsu_1), logical_delay(v2_1, rsu_1)));
+    axiom(is_triggered_by(rsu_2, rsu_1, logical_delay(rsu_1, rsu_2)));
+    axiom(is_triggered_by_2(rsu_3, v1_3, v2_3, logical_delay(v1_3, rsu_3), logical_delay(v2_3, rsu_3)));
      
-    /* Debug case 1 */
-    // axiom(exists (i : integer) :: id(elem(i)) == controller_2);
+    /* Debug macro */
+    define exists_in_trace(e : id_t) : boolean
+    = exists (i : integer) :: in_range(i) && id(elem(i)) == e;
+
+    /* Debug cases */
+    axiom(exists_in_trace(rsu_2));
     property test : false;
      
     //////////////////////////////////////////////////
