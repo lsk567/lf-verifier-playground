@@ -1,0 +1,28 @@
+target C;
+
+reactor Source {
+    output out:int;
+    
+    reaction(startup) -> out {=
+        SET(out, 1);
+    =}
+}
+
+reactor Sink {
+    input[2] _in:int;
+    
+    reaction(_in) {=
+        for (int i = 0; i < 2; i++) {
+            if (_in[i]->is_present) {
+                info_print("Received input from source %d: %d.", i, _in[i]->value);
+            }
+        }
+    =}
+}
+
+main reactor {
+    source = new[2] Source();
+    sink = new Sink();
+    
+    source.out -> sink._in;
+}

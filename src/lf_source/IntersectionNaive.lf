@@ -7,13 +7,21 @@ reactor Vehicle {
     output done:bool;
     output request:bool;
     
-    physical action arrive;
+    logical action arrive(2 sec);
+    // physical action arrive
     logical action finish;
     
-    state duration_of_use:time(10 sec);
+    state duration_of_use:time(1 sec);
     
-    reaction(arrive) -> request {=
-        SET(arrive, true);
+    reaction(arrive) -> request, arrive {=
+        info_print("Vehicle %d has arrived.", self->bank_index);
+        SET(request, true);
+        
+        // Schedule the next vehicle.
+        // This will be replaced by the dynamic
+        // joining of federates once the infrastructure
+        // is available.
+        schedule(arrive, 0);
     =}
     
     reaction(grant) -> finish {=
@@ -24,6 +32,11 @@ reactor Vehicle {
     reaction(finish) -> done {=
         SET(done, true);
         info_print("Vehicle %d: leaves the intersection.", self->bank_index);
+    =}
+    
+    reaction(startup) -> arrive {=
+        info_print("Startup: waiting for the first vehicle %d to arrive.", self->bank_index);
+        schedule(arrive, 0);
     =}
 }
 
@@ -36,9 +49,8 @@ reactor RSU (
     output[num_vehicles] grant:bool;
     
     state assigned:bool;
-    state last_grant:time(0);
+    state next_free:time(0);
     state const_wait:time(1 sec); // This can in fact be dynamically calculated and can still produce the same issue.
-    state num_queued:int(0); // Number of unprocessed requests.
     
     logical action issue_grant:int;
     
@@ -53,27 +65,29 @@ reactor RSU (
      * 		of remaining wait time + wait times from pending requests.
      */
     reaction(request) -> issue_grant {=
+        info_print("In reaction to request.");
         for (int i = 0; i < self->num_vehicles; i++) {
-			if (request[i].is_present) {
-                // Check to see if it has waited long enough.
+			if (request[i]->is_present) {                
                 instant_t current_time = get_logical_time();
-                instant_t remaining_wait = self->last_grant + self->wait_time - current_time;
-                instant_t cumulated_wait = remaining_wait + self->num_queued * self->const_wait;
-                schedule_int(issue_grant, i, cumulated_wait);
-                self->queued_request++;
+                if (current_time > self->next_free) {
+                    schedule_int(issue_grant, 0, i);
+                }
+                else {
+                    schedule_int(issue_grant, self->next_free - current_time, i);
+                }
+                self->next_free += self->const_wait;
             }
         }
     =}
     
     reaction(issue_grant) -> grant {=
-        self->num_queued--;
-        self->last_grant = get_logical_time();
-        SET(request[issue_grant->value], true);
+        info_print("In reaction to issue_grant.");
+        SET(grant[issue_grant->value], true);
         info_print("RSU: grants the right of way to vehicle %d.", issue_grant->value);
     =}
     
     reaction(done) {=
-        ... RSU is notified.
+        info_print("RSU is notified.");
     =}
 }
 
