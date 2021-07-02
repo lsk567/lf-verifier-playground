@@ -61,12 +61,24 @@ module main {
     // Return true if two events occur on the same federate.
     define _id_same_fed(e1, e2 : element_t) : boolean
     = (id(e1) == id(e2) && id(e1) != NULL && id(e2) != NULL)
-        || (id(e1) == controller_1 && id(e2) == controller_2);
+        || (id(e1) == rsu_1 && id(e2) == rsu_2)
+        || (id(e1) == rsu_1 && id(e2) == rsu_3)
+        || (id(e1) == rsu_2 && id(e2) == rsu_3)
+        || (id(e1) == v1_1 && id(e2) == v1_2)
+        || (id(e1) == v1_1 && id(e2) == v1_3)
+        || (id(e1) == v1_2 && id(e2) == v1_3)
+        || (id(e1) == v2_1 && id(e2) == v2_2)
+        || (id(e1) == v2_1 && id(e2) == v2_3)
+        || (id(e1) == v2_2 && id(e2) == v2_3);
 
     // Return true if two events occur on different federates.
     define _id_diff_fed(e1, e2 : element_t) : boolean
-    = (id(e1) == controller_2 && id(e2) == door_1)
-        || (id(e1) == controller_2 && id(e2) == train_1);
+    = (id(e1) == v1_3 && id(e2) == rsu_3)
+        || (id(e1) == v1_1 && id(e2) == rsu_1)
+        || (id(e1) == v2_3 && id(e2) == rsu_3)
+        || (id(e1) == v2_1 && id(e2) == rsu_1)
+        || (id(e1) == rsu_2 && id(e2) == v1_1)
+        || (id(e1) == rsu_2 && id(e2) == v2_1);
 
     // Return true if e1 happened before e2 in the same federate,
     // by comparing the tags and the priorities of the two events.
@@ -325,94 +337,19 @@ module main {
     /*******************************
      * Application-specific axioms *
      *******************************/
+    /*
     axiom(is_triggered_by_startup(controller_1));
     axiom(is_triggered_by_physical_action(controller_2));
     axiom(is_definitely_triggered_by(door_1, controller_2, logical_delay(controller_2, door_1)));
     axiom(is_definitely_triggered_by(train_1, controller_2, logical_delay(controller_2, train_1)));
+
+    axiom(is_triggered_by_physical_action(v1_1));
+    axiom();
+    */
      
-    // [placeholder] Add user-defined properties here.
-    // Train does not move until door locks.
-    // G(U(!is_train, is_door))
-    define is_train(e : element_t) : boolean
-    = id(e) == train_1;
-    define is_door(e : element_t) : boolean
-    = id(e) == door_1;
-    define p(e : element_t) : boolean
-    = !is_train(e);
-    define q(e : element_t) : boolean
-    = is_door(e);
-    
-    // Strong Until
-    define U(modality_idx : integer) : boolean
-    = exists (i : integer) :: in_range(i) && q(elem(i))
-        && (forall (j : integer) :: (modality_idx <= j && j < i)
-            ==> p(elem(j)));
-    
-    // Weak Until
-    define W(modality_idx : integer) : boolean
-    = // G(p) \/ U(p, q)
-        // G(p)
-        (forall (i : integer) :: (in_range(i) && i >= modality_idx) ==> p(elem(i)))
-        // \/ U(p, q)
-        || U(modality_idx);
-    
-    define G_U(modality_idx : integer) : boolean
-    = forall (k : integer) :: (in_range(k) && k >= modality_idx) ==> U(k);
-
-    define G_W(modality_idx : integer) : boolean
-    = forall (k : integer) :: (in_range(k) && k >= modality_idx) ==> W(k);
-
-    /**
-     * Counterexample returns the following trace:
-     *
-     * ```
-     * (_tuple_0 controller_1 (_tuple_1 0 0))
-     * (_tuple_0 NULL (_tuple_1 1 2))
-     * (_tuple_0 NULL (_tuple_1 3 4))
-     * (_tuple_0 NULL (_tuple_1 5 6))
-     * (_tuple_0 NULL (_tuple_1 7 8))
-     * (_tuple_0 NULL (_tuple_1 10 11))
-     * (_tuple_0 NULL (_tuple_1 12 13))
-     * (_tuple_0 NULL (_tuple_1 14 15))
-     * (_tuple_0 NULL (_tuple_1 16 17))
-     * (_tuple_0 NULL (_tuple_1 18 19))
-     * ```
-     * 
-     * which makes sense, since U is strong until.
-     * For this property to hold, we need weak until.
-     */
-    // property prop : G_U(0);
-
-    /** 
-     * Interesting counterexample:
-     *
-     * ```
-     * (_tuple_0 controller_1 (_tuple_1 0 0))
-     * (_tuple_0 controller_2 (_tuple_1 14188 2793))
-     * (_tuple_0 door_1 (_tuple_1 14188 2794))
-     * (_tuple_0 train_1 (_tuple_1 14188 2794))
-     * ```
-     *
-     * To see this CEX, we need a Weak Until to
-     * account for the case when controller_2 is never
-     * invoked (never triggered by physical action).
-     * In addition, we need **is_definitely_triggered_by**
-     * to define a contract on the reaction body that
-     * the code must produce output.
-     * 
-     * Otherwise, this interesting case will be
-     * masked by the fact that reaction does not write
-     * to both output ports. This also shows that in
-     * "The door does not open until train stops,"
-     * we must use the weak until to better describe
-     * the system, since there is a chance that
-     * the physical action does not occur.
-     */
-    property prop2 : G_W(0); 
-
     /* Debug case 1 */
     // axiom(exists (i : integer) :: id(elem(i)) == controller_2);
-    // property test : false;
+    property test : false;
      
     //////////////////////////////////////////////////
      
