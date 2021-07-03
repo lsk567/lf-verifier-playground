@@ -1,4 +1,6 @@
-target C;
+target C {
+    coordination: decentralized
+};
 
 reactor Vehicle {
 	
@@ -7,13 +9,13 @@ reactor Vehicle {
     output done:bool;
     output request:bool;
     
-    logical action arrive(2 sec);
-    // physical action arrive
-    logical action finish;
+    // logical action arrive(2 sec);
+    physical action arrive
+    physical action finish;
     
     state duration_of_use:time(1 sec);
     
-    reaction(arrive) -> request, arrive {=
+    reaction(arrive) -> request /*, arrive*/ {=
         info_print("Vehicle %d has arrived.", self->bank_index);
         SET(request, true);
         
@@ -21,7 +23,7 @@ reactor Vehicle {
         // This will be replaced by the dynamic
         // joining of federates once the infrastructure
         // is available.
-        schedule(arrive, 0);
+        // schedule(arrive, 0);
     =}
     
     reaction(grant) -> finish {=
@@ -34,10 +36,12 @@ reactor Vehicle {
         info_print("Vehicle %d: leaves the intersection.", self->bank_index);
     =}
     
+    /*
     reaction(startup) -> arrive {=
         info_print("Startup: waiting for the first vehicle %d to arrive.", self->bank_index);
         schedule(arrive, 0);
     =}
+    */
 }
 
 reactor RSU (
@@ -91,7 +95,7 @@ reactor RSU (
     =}
 }
 
-main reactor (
+federated reactor (
     num_vehicles:int(2)
 ) {
     
