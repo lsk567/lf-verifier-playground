@@ -557,6 +557,7 @@ module main {
      * (_tuple_0 rsu_3 (_tuple_1 11 10016)) *
      * (_tuple_0 NULL (_tuple_1 11 10009))  *
      ****************************************/
+    /*
     // Check if the current event is a.arrive.
     define phi1(modality : integer) : boolean
     = id(elem(modality)) == v1_1; // a.arrive
@@ -608,15 +609,80 @@ module main {
     define phi12(modality : integer) : boolean
     = phi5(modality) ==> phi11(modality);
     
-    /*
-    axiom(phi12(0));
-    axiom(exists_in_trace(v1_1));
-    axiom(exists_in_trace(v1_2));
-    property test : false;
-    */
+    // axiom(phi12(0));
+    // axiom(exists_in_trace(v1_1));
+    // axiom(exists_in_trace(v1_2));
+    // property test : false;
     property fairness : phi12(0);
-
+    */
      
+    /****************************************
+     * (a.arrive) /\ X(F(b.arrives))        *
+     *  ==> F((a.done) /\ X(F(b.grant)))    *
+     *                                      *
+     * (_tuple_0 v1_1 (_tuple_1 11 10011))  *
+     * (_tuple_0 v2_1 (_tuple_1 11 10011))  *
+     * (_tuple_0 rsu_1 (_tuple_1 11 10012)) *
+     * (_tuple_0 rsu_2 (_tuple_1 11 10013)) *
+     * (_tuple_0 v2_2 (_tuple_1 11 10014))  *
+     * (_tuple_0 v2_3 (_tuple_1 11 10015))  *
+     * (_tuple_0 v1_2 (_tuple_1 11 10014))  *
+     * (_tuple_0 v1_3 (_tuple_1 11 10015))  *
+     * (_tuple_0 rsu_3 (_tuple_1 11 10016)) *
+     * (_tuple_0 NULL (_tuple_1 11 10009))  *
+     ****************************************/
+    // Check if the current event is a.arrive.
+    define phi1(modality : integer) : boolean
+    = id(elem(modality)) == v1_1; // a.arrive
+
+    // Check if the current event is b.arrive.
+    define phi2(modality : integer) : boolean
+    = id(elem(modality)) == v2_1; // b.arrive
+    
+    // phi3 := F(phi2)
+    define phi3(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi2(i);
+
+    // phi4 := X(phi3)
+    define phi4(modality : integer) : boolean
+    = phi3(modality+1);
+
+    // phi5 := phi1 /\ phi4
+    define phi5(modality : integer) : boolean
+    = phi1(modality) && phi4(modality);
+
+    // Check if the current event is a.grant.
+    define phi6(modality : integer) : boolean
+    = id(elem(modality)) == v1_3; // a.done
+
+    // Check if the current event is b.grant.
+    define phi7(modality : integer) : boolean
+    = id(elem(modality)) == v2_2; // b.grant
+    
+    // phi8 := F(phi7)
+    define phi8(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi7(i);
+
+    // phi9 := X(phi8)
+    define phi9(modality : integer) : boolean
+    = phi8(modality+1);
+
+    // phi10 := phi6 /\ phi9
+    define phi10(modality : integer) : boolean
+    = phi6(modality) && phi9(modality);
+
+    // phi11 := F(phi10)
+    define phi11(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi10(i);
+
+    // phi12 := phi5 ==> phi11
+    define phi12(modality : integer) : boolean
+    = phi5(modality) ==> phi11(modality);
+    
+    property mutual_exclusion : phi12(0);
     //////////////////////////////////////////////////
      
     control {
