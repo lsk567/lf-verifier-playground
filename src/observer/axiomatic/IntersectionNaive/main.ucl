@@ -295,6 +295,29 @@ module main {
             && g(elem(i)) == tag_schedule(g(elem(j)), delay2))
     ));
 
+    // One of the two reactions must output.
+    define is_definitely_triggered_by_2(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == down ==> (
+            (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up1 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+            || (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up2 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay2))
+    )) &&
+    (forall (j : integer) :: in_range(j) ==>
+        (
+            (id(elem(j)) == up1 ==> (exists (i : integer) :: in_range(i)
+                && id(elem(i)) == down
+                && g(elem(i)) == tag_schedule(g(elem(j)), delay)))
+            &&
+            (id(elem(j)) == up2 ==> (exists (i : integer) :: in_range(i)
+                && id(elem(i)) == down
+                && g(elem(i)) == tag_schedule(g(elem(j)), delay2)))
+        )
+    );
+
     // This macro ensures that the upstream MUST output.
     define is_definitely_triggered_by(downstream, upstream : id_t,
         delay : interval_t) : boolean
@@ -350,14 +373,14 @@ module main {
      * Application-specific axioms *
      *******************************/
     axiom(is_triggered_by_physical_action(v1_1));
-    axiom(is_triggered_by(v1_2, rsu_2, logical_delay(rsu_2, v1_2)));
-    axiom(is_triggered_by(v1_3, v1_2, logical_delay(v1_2, v1_3)));
+    axiom(is_definitely_triggered_by(v1_2, rsu_2, logical_delay(rsu_2, v1_2)));
+    axiom(is_definitely_triggered_by(v1_3, v1_2, logical_delay(v1_2, v1_3)));
     axiom(is_triggered_by_physical_action(v2_1));
-    axiom(is_triggered_by(v2_2, rsu_2, logical_delay(rsu_2, v2_2)));
-    axiom(is_triggered_by(v2_3, v2_2, logical_delay(v2_2, v2_3)));
-    axiom(is_triggered_by_2(rsu_1, v1_1, v2_1, logical_delay(v1_1, rsu_1), logical_delay(v2_1, rsu_1)));
-    axiom(is_triggered_by(rsu_2, rsu_1, logical_delay(rsu_1, rsu_2)));
-    axiom(is_triggered_by_2(rsu_3, v1_3, v2_3, logical_delay(v1_3, rsu_3), logical_delay(v2_3, rsu_3)));
+    axiom(is_definitely_triggered_by(v2_2, rsu_2, logical_delay(rsu_2, v2_2)));
+    axiom(is_definitely_triggered_by(v2_3, v2_2, logical_delay(v2_2, v2_3)));
+    axiom(is_definitely_triggered_by_2(rsu_1, v1_1, v2_1, logical_delay(v1_1, rsu_1), logical_delay(v2_1, rsu_1)));
+    axiom(is_definitely_triggered_by(rsu_2, rsu_1, logical_delay(rsu_1, rsu_2)));
+    axiom(is_definitely_triggered_by_2(rsu_3, v1_3, v2_3, logical_delay(v1_3, rsu_3), logical_delay(v2_3, rsu_3)));
     
     /*********
      * Debug *
@@ -365,6 +388,13 @@ module main {
     /* Debug macro */
     define exists_in_trace(e : id_t) : boolean
     = exists (i : integer) :: in_range(i) && id(elem(i)) == e;
+    define at_least_two_in_trace(e : id_t) : boolean
+    = exists (i, j : integer) :: in_range(i) && in_range(j)
+        && id(elem(i)) == e 
+        && id(elem(j)) == e
+        && i != j;
+    define at_most_one_in_trace(e : id_t) : boolean
+    = !at_least_two_in_trace(e);
 
     /* Debug cases */
     // axiom(exists_in_trace(rsu_2));
@@ -374,8 +404,10 @@ module main {
      * Properties *
      **************/
     /*****************************************
-     * Property: 
-     * ((G(!b.arrive)) W (a.arrive))
+     * Property: If a arrives before b, then
+     * a should receive the grant before b.
+     *
+     * LTL: ((G(!b.arrive)) W (a.arrive))
      * ==> ((G(!b.grant)) W (a.grant))
      *
      * Breaking it down:
@@ -399,6 +431,7 @@ module main {
      *
      * p13: p6 ==> p12
      ****************************************/
+    /*
     define p1(e : element_t) : boolean
     = !(id(e) == v2_1);
     define p2(e : element_t) : boolean
@@ -431,8 +464,92 @@ module main {
 
     define p13(modality_idx : integer) : boolean
     = p6(modality_idx) ==> p12(modality_idx);
+    
+    define p14(modality_idx : integer) : boolean
+    = p5(modality_idx) ==> p11(modality_idx);
 
-    property fairness : p13(0);
+    axiom(at_most_one_in_trace(v1_1));
+    axiom(at_most_one_in_trace(v2_1));
+    // axiom(at_least_two_in_trace(v2_1));
+    property fairness : p14(0);
+    // axiom(exists_in_trace(v2_1));
+    // property test : false;
+    */
+
+    /****************************************
+     * (a.arrive) /\ X(F(b.arrives))        *
+     *  ==> F((a.grant) /\ X(F(b.grant)))   *
+     *
+     * (_tuple_0 v1_1 (_tuple_1 11 10011))  *
+     * (_tuple_0 v2_1 (_tuple_1 11 10011))  *
+     * (_tuple_0 rsu_1 (_tuple_1 11 10012)) *
+     * (_tuple_0 rsu_2 (_tuple_1 11 10013)) *
+     * (_tuple_0 v2_2 (_tuple_1 11 10014))  *
+     * (_tuple_0 v2_3 (_tuple_1 11 10015))  *
+     * (_tuple_0 v1_2 (_tuple_1 11 10014))  *
+     * (_tuple_0 v1_3 (_tuple_1 11 10015))  *
+     * (_tuple_0 rsu_3 (_tuple_1 11 10016)) *
+     * (_tuple_0 NULL (_tuple_1 11 10009))  *
+     ****************************************/
+    // Check if the current event is a.arrive.
+    define phi1(modality : integer) : boolean
+    = id(elem(modality)) == v1_1; // a.arrive
+
+    // Check if the current event is b.arrive.
+    define phi2(modality : integer) : boolean
+    = id(elem(modality)) == v2_1; // b.arrive
+    
+    // phi3 := F(phi2)
+    define phi3(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi2(i);
+
+    // phi4 := X(phi3)
+    define phi4(modality : integer) : boolean
+    = phi3(modality+1);
+
+    // phi5 := phi1 /\ phi4
+    define phi5(modality : integer) : boolean
+    = phi1(modality) && phi4(modality);
+
+    // Check if the current event is a.grant.
+    define phi6(modality : integer) : boolean
+    = id(elem(modality)) == v1_2; // a.grant
+
+    // Check if the current event is b.grant.
+    define phi7(modality : integer) : boolean
+    = id(elem(modality)) == v2_2; // b.grant
+    
+    // phi8 := F(phi7)
+    define phi8(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi7(i);
+
+    // phi9 := X(phi8)
+    define phi9(modality : integer) : boolean
+    = phi8(modality+1);
+
+    // phi10 := phi6 /\ phi9
+    define phi10(modality : integer) : boolean
+    = phi6(modality) && phi9(modality);
+
+    // phi11 := F(phi10)
+    define phi11(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi10(i);
+
+    // phi12 := phi5 ==> phi11
+    define phi12(modality : integer) : boolean
+    = phi5(modality) ==> phi11(modality);
+    
+    /*
+    axiom(phi12(0));
+    axiom(exists_in_trace(v1_1));
+    axiom(exists_in_trace(v1_2));
+    property test : false;
+    */
+    property fairness : phi12(0);
+
      
     //////////////////////////////////////////////////
      
