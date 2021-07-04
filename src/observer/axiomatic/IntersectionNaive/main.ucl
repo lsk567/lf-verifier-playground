@@ -4,10 +4,149 @@
  
 module main {
  
-    type    * = common.*;
-    define  * = common.*;
-    const   * = common.*;
+    /*******************************
+     * Time and Related Operations *
+     ******************************/
+    type timestamp_t = integer; // Unit is nanoseconds
+    type microstep_t = integer;
+    type tag_t = {
+        timestamp_t,
+        microstep_t
+    };
+    // FIXME: in LF, the interval is an integer.
+    type interval_t  = tag_t;
+    
+    // Projection macros
+    define pi1(t : tag_t)   : timestamp_t   = t._1;         // Get timestamp from tag
+    define pi2(t : tag_t)   : microstep_t   = t._2;         // Get microstep from tag
+    
+    // Interval constructor
+    define zero() : interval_t
+    = {0, 0};
+    define startup() : interval_t
+    = zero();
+    define mstep() : interval_t
+    = {0, 1};
+    define nsec(t : integer) : interval_t
+    = {t, 0};
+    define usec(t : integer) : interval_t
+    = {t * 1000, 0};
+    define msec(t : integer) : interval_t
+    = {t * 1000000, 0};
+    define sec(t : integer) : interval_t
+    = {t * 1000000000, 0};
+    define inf() : interval_t
+    = {-1, 0};
+    
+    // Helper function
+    define isInf(i : interval_t) : boolean
+    = pi1(i) < 0;
+    
+    // Tag comparison
+    define tag_later(t1 : tag_t, t2 : tag_t) : boolean
+    = pi1(t1) > pi1(t2)
+        || (pi1(t1) == pi1(t2) && pi2(t1) > pi2(t2))
+        || (isInf(t1) && !isInf(t2));
+    
+    define tag_same(t1 : tag_t, t2 : tag_t) : boolean
+    = t1 == t2;
+    
+    define tag_earlier(t1 : tag_t, t2 : tag_t) : boolean
+    = pi1(t1) < pi1(t2)
+        || (pi1(t1) == pi1(t2) && pi2(t1) < pi2(t2))
+        || (!isInf(t1) && isInf(t2));
+    
+    // Tag algebra
+    define tag_schedule(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && pi1(i) == 0 && !isInf(i))
+        then { pi1(t), pi2(t) + 1 } // microstep delay
+        else ( if (!isInf(t) && pi1(i) > 0 && !isInf(i))
+            then { pi1(t) + pi1(i), 0 }
+            else inf());
+    
+    define tag_delay(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && !isInf(i))
+        then { pi1(t) + pi1(i), pi2(t) + pi2(i) }
+        else inf();
+    
+    // Only consider timestamp for now.
+    define tag_diff(t1, t2: tag_t) : interval_t
+    = if (!isInf(t1) && !isInf(t2))
+        then { pi1(t1) - pi1(t2), pi2(t1) - pi2(t2) }
+        else inf();
      
+    /**********************************
+     * Reactions & connectivity graph *
+     *********************************/
+    
+    //////////////////////////
+    // Application Specific
+    // Element IDs
+    type id_t = enum {  
+        NULL,                   // NULL 
+        rsu_1, rsu_2, rsu_3,    // RSU reactions
+        v1_1, v1_2, v1_3,
+        v2_1, v2_2, v2_3
+    };
+    //////////////////////////
+     
+    /*****************
+     * Trace Element *
+     ****************/
+    type element_t = { id_t, tag_t };
+    
+    // Projection macros
+    define id(e : element_t) : id_t     = e._1;
+    define g(e : element_t) : tag_t     = e._2;
+    
+    define isNULL(e : element_t) : boolean = id(e) == NULL;
+     
+    /********************
+     * Trace Definition *
+     *******************/
+    const START : integer = 0;
+    const END : integer = 9;
+    
+    define in_range(num : integer) : boolean
+    = num >= START && num <= END;
+    
+    type step_t = integer;
+    type trace_t = { 
+        element_t,
+        element_t,
+        element_t,
+        element_t,
+        element_t,
+        element_t,
+        element_t,
+        element_t,
+        element_t,
+        element_t
+    };
+    
+    define get(tr : trace_t, i : step_t) : element_t 
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else (
+                if (i == 3) then tr._4 else (
+                    if (i == 4) then tr._5 else (
+                        if (i == 5) then tr._6 else (
+                            if (i == 6) then tr._7 else (
+                                if (i == 7) then tr._8 else (
+                                    if (i == 8) then tr._9 else (
+                                        if (i == 9) then tr._10 else (
+                                            { NULL, inf() }
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
     // Mark the start of the trace.
     var start : timestamp_t;
     assume(start == pi1(zero()));
