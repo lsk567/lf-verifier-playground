@@ -93,13 +93,13 @@ module main {
     /*****************
      * Trace Element *
      ****************/
-    type element_t = { id_t, tag_t };
+    type event_t = { id_t, tag_t };
     
     // Projection macros
-    define id(e : element_t) : id_t     = e._1;
-    define g(e : element_t) : tag_t     = e._2;
+    define id(e : event_t) : id_t     = e._1;
+    define g(e : event_t) : tag_t     = e._2;
     
-    define isNULL(e : element_t) : boolean = id(e) == NULL;
+    define isNULL(e : event_t) : boolean = id(e) == NULL;
      
     /********************
      * Trace Definition *
@@ -112,19 +112,19 @@ module main {
     
     type step_t = integer;
     type trace_t = { 
-        element_t,
-        element_t,
-        element_t,
-        element_t,
-        element_t,
-        element_t,
-        element_t,
-        element_t,
-        element_t,
-        element_t
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t
     };
     
-    define get(tr : trace_t, i : step_t) : element_t 
+    define get(tr : trace_t, i : step_t) : event_t 
     = if (i == 0) then tr._1 else (
         if (i == 1) then tr._2 else (
             if (i == 2) then tr._3 else (
@@ -156,7 +156,7 @@ module main {
     var trace : trace_t;
     
     // Helper macro that returns an element based on index
-    define elem(i : integer) : element_t
+    define elem(i : integer) : event_t
     = get(trace, i);
      
     /************
@@ -198,7 +198,7 @@ module main {
     = inf();
 
     // Return true if two events occur on the same federate.
-    define _id_same_fed(e1, e2 : element_t) : boolean
+    define _connected_id_same_fed(e1, e2 : event_t) : boolean
     = (id(e1) == id(e2) && id(e1) != NULL && id(e2) != NULL)
         || (id(e1) == rsu_1 && id(e2) == rsu_2)
         || (id(e1) == rsu_1 && id(e2) == rsu_3)
@@ -211,7 +211,7 @@ module main {
         || (id(e1) == v2_2 && id(e2) == v2_3);
 
     // Return true if two events occur on different federates.
-    define _id_diff_fed(e1, e2 : element_t) : boolean
+    define _connected_id_diff_fed(e1, e2 : event_t) : boolean
     = (id(e1) == v1_3 && id(e2) == rsu_3)
         || (id(e1) == v1_1 && id(e2) == rsu_1)
         || (id(e1) == v2_3 && id(e2) == rsu_3)
@@ -223,7 +223,7 @@ module main {
     // by comparing the tags and the priorities of the two events.
     //
     // TODO: account for nested reactors in federates.
-    define _hb_same_fed(_e1, _e2 : element_t) : boolean
+    define _hb_same_fed(_e1, _e2 : event_t) : boolean
     = tag_earlier(g(_e1), g(_e2)) ||
         (tag_same(g(_e1), g(_e2)) && priority(id(_e1)) < priority(id(_e2)));
     
@@ -232,20 +232,20 @@ module main {
     // and the logical delay in the connection.
     //
     // FIXME: account for physical connections.
-    define _hb_diff_fed(_e1, _e2 : element_t) : boolean
+    define _hb_diff_fed(_e1, _e2 : event_t) : boolean
     = tag_earlier(tag_delay(g(_e1), logical_delay(id(_e1), id(_e2))), g(_e2))
         || tag_same(tag_delay(g(_e1), logical_delay(id(_e1), id(_e2))), g(_e2));
     
     // Check the happened-before relation between two immediate events.
-    define _hb(_e1, _e2 : element_t) : boolean
+    define _hb(_e1, _e2 : event_t) : boolean
     =   // If two events belong to the same federate,
         // determine hb via tags.
         // This is bi-directional.
-        (_id_same_fed(_e1, _e2) && _hb_same_fed(_e1, _e2))
+        (_connected_id_same_fed(_e1, _e2) && _hb_same_fed(_e1, _e2))
         // If two events belong to different federates,
         // check if a connection is present.
         // This is uni-directional.
-        || (_id_diff_fed(_e1, _e2) && _hb_diff_fed(_e1, _e2));
+        || (_connected_id_diff_fed(_e1, _e2) && _hb_diff_fed(_e1, _e2));
     
 
     /**
@@ -262,7 +262,7 @@ module main {
      */
 
     // HB path with 1 ed_ge
-    define hb_1(e1, e2 : element_t) : boolean
+    define hb_1(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b : integer) :: in_range(a) && in_range(b) 
         // Check if a path between e1 and e2 exists.
@@ -271,7 +271,7 @@ module main {
         && a < b; 
     
     // HB path with 2 ed_ges
-    define hb_2(e1, e2 : element_t) : boolean
+    define hb_2(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c : integer) :: elem(a) == e1 && elem(c) == e2 
         // Check if a path between e1 and e2 exists.
@@ -279,7 +279,7 @@ module main {
         && a < b && b < c;
     
     // HB path with 3 ed_ges
-    define hb_3(e1, e2 : element_t) : boolean
+    define hb_3(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c, d : integer) :: elem(a) == e1 && elem(d) == e2 
         // Check if a path between e1 and e2 exists.
@@ -287,7 +287,7 @@ module main {
         && a < b && b < c && c < d;
     
     // HB path with 4 ed_ges
-    define hb_4(e1, e2 : element_t) : boolean
+    define hb_4(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c, d, e : integer) :: elem(a) == e1 && elem(e) == e2 
         // Check if a path between e1 and e2 exists.
@@ -296,7 +296,7 @@ module main {
         && a < b && b < c && c < d && d < e;
 
     // HB path with 5 ed_ges
-    define hb_5(e1, e2 : element_t) : boolean
+    define hb_5(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c, d, e, f : integer) :: elem(a) == e1 && elem(f) == e2 
         // Check if a path between e1 and e2 exists.
@@ -305,7 +305,7 @@ module main {
         && a < b && b < c && c < d && d < e && e < f;
 
     // HB path with 6 ed_ges
-    define hb_6(e1, e2 : element_t) : boolean
+    define hb_6(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c, d, e, f, _g : integer) :: elem(a) == e1 && elem(_g) == e2 
         // Check if a path between e1 and e2 exists.
@@ -314,7 +314,7 @@ module main {
         && a < b && b < c && c < d && d < e && e < f && f < _g;
 
     // HB path with 7 ed_ges
-    define hb_7(e1, e2 : element_t) : boolean
+    define hb_7(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c, d, e, f, _g, h : integer) :: elem(a) == e1 && elem(h) == e2 
         // Check if a path between e1 and e2 exists.
@@ -324,7 +324,7 @@ module main {
         && a < b && b < c && c < d && d < e && e < f && f < _g && _g < h;
 
     // HB path with 8 ed_ges
-    define hb_8(e1, e2 : element_t) : boolean
+    define hb_8(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c, d, e, f, _g, h, i : integer) :: elem(a) == e1 && elem(i) == e2 
         // Check if a path between e1 and e2 exists.
@@ -334,7 +334,7 @@ module main {
         && a < b && b < c && c < d && d < e && e < f && f < _g && _g < h && h < i;
 
     // HB path with 9 ed_ges
-    define hb_9(e1, e2 : element_t) : boolean
+    define hb_9(e1, e2 : event_t) : boolean
     // Link e1, e2 to the start and end of a path.
     = exists (a, b, c, d, e, f, _g, h, i, j : integer) :: elem(a) == e1 && elem(j) == e2 
         // Check if a path between e1 and e2 exists.
@@ -344,7 +344,7 @@ module main {
         && a < b && b < c && c < d && d < e && e < f && f < _g && _g < h && h < i && i < j;
 
     // Transitive "happened-before" definition
-    define hb(e1, e2 : element_t) : boolean
+    define hb(e1, e2 : event_t) : boolean
     = hb_1(e1, e2) || hb_2(e1, e2) || hb_3(e1, e2)
         || hb_4(e1, e2) || hb_5(e1, e2) || hb_6(e1, e2)
         || hb_7(e1, e2) || hb_8(e1, e2) || hb_9(e1, e2);
@@ -364,10 +364,10 @@ module main {
         && pi2(t) == 0;                           
     
     // first & last in trace
-    define first(e : element_t) : boolean
+    define first(e : event_t) : boolean
     = !(exists (i : integer) :: in_range(i) && id(elem(i)) == id(e) && tag_earlier(g(elem(i)), g(e))); 
     
-    define last(e : element_t) : boolean
+    define last(e : event_t) : boolean
     = !(exists (i : integer) :: in_range(i) && id(elem(i)) == id(e) && tag_later(g(elem(i)), g(e))); 
     
     define is_triggered_by_startup(_id : id_t) : boolean
@@ -405,7 +405,7 @@ module main {
         // both in_range's are needed due to !(exists), which turns into a forall.
         && !(exists (b, a : integer) :: in_range(a) && in_range(b)
             && id(elem(b)) != _id
-            && _id_same_fed(elem(b), {_id, zero()})
+            && _connected_id_same_fed(elem(b), {_id, zero()})
             && id(elem(a)) == _id
             && (_is_latest_invocation_in_same_fed_wrt_(a, b)
                 && tag_later(g(elem(b)), tag_schedule(g(elem(a)), timer_period(_id))) ));
