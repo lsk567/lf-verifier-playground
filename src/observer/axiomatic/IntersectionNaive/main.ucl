@@ -149,7 +149,7 @@ module main {
 
     // Mark the start of the trace.
     var start : timestamp_t;
-    assume(start == pi1(zero()));
+    assume(start >= pi1(zero()));
      
     // Declare the trace
     // The counterexample reflects a particular frame of reference.
