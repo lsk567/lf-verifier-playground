@@ -198,7 +198,7 @@ module main {
     = inf();
 
     // Return true if two events occur on the same federate.
-    define _connected_id_same_fed(e1, e2 : event_t) : boolean
+    define _id_same_fed(e1, e2 : event_t) : boolean
     = (id(e1) == id(e2) && id(e1) != NULL && id(e2) != NULL)
         || (id(e1) == rsu_1 && id(e2) == rsu_2)
         || (id(e1) == rsu_1 && id(e2) == rsu_3)
@@ -241,7 +241,7 @@ module main {
     =   // If two events belong to the same federate,
         // determine hb via tags.
         // This is bi-directional.
-        (_connected_id_same_fed(_e1, _e2) && _hb_same_fed(_e1, _e2))
+        (_id_same_fed(_e1, _e2) && _hb_same_fed(_e1, _e2))
         // If two events belong to different federates,
         // check if a connection is present.
         // This is uni-directional.
@@ -405,7 +405,7 @@ module main {
         // both in_range's are needed due to !(exists), which turns into a forall.
         && !(exists (b, a : integer) :: in_range(a) && in_range(b)
             && id(elem(b)) != _id
-            && _connected_id_same_fed(elem(b), {_id, zero()})
+            && _id_same_fed(elem(b), {_id, zero()})
             && id(elem(a)) == _id
             && (_is_latest_invocation_in_same_fed_wrt_(a, b)
                 && tag_later(g(elem(b)), tag_schedule(g(elem(a)), timer_period(_id))) ));
