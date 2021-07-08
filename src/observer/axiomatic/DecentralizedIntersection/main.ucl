@@ -695,7 +695,6 @@ module main {
     axiom(precedes(im1_3, c1_3));
     axiom(precedes(im1_4, c1_3));
 
-
     axiom(precedes(c2_1, im2_2));
     axiom(precedes(c2_2, im2_1));
     axiom(precedes(c2_2, im2_4));
@@ -703,8 +702,6 @@ module main {
     axiom(precedes(im2_2, im1_3));
     axiom(precedes(im2_3, c2_3));
     axiom(precedes(im2_4, c2_3));
-
-    // axiom(precedes(c2_2, im2_1));
 
     /*********
      * Debug *
