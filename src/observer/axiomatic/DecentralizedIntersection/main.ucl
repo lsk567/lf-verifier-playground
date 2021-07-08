@@ -362,14 +362,6 @@ module main {
     )
     ;
 
-    // FIXME: to deprecate and replace by is_connected.
-    // Return true if two events occur on different federates.
-    define _connected_id_diff_fed(e1, e2 : event_t) : boolean
-    = (id(e1) == im1_1 && id(e2) == im2_4)
-        || (id(e1) == im2_1 && id(e2) == im1_4)
-        || (id(e1) == im1_2 && id(e2) == im2_3)
-        || (id(e1) == im2_2 && id(e2) == im1_3);
-
     // Return true if e1 happened before e2 in the same federate,
     // by comparing the tags and the priorities of the two events.
     //
@@ -386,8 +378,6 @@ module main {
     // Return true if e1 happened before e2 in different federates
     // and e1 has a connection to e2. This check uses the time tags
     // and the logical delay in the connection.
-    //
-    // FIXME: account for physical connections.
     define _hb_diff_fed(_e1, _e2 : event_t) : boolean
     = tag_earlier(tag_delay(g(_e1), logical_delay(id(_e1), id(_e2))), g(_e2))
         || tag_same(tag_delay(g(_e1), logical_delay(id(_e1), id(_e2))), g(_e2));
@@ -641,25 +631,6 @@ module main {
             && g(elem(i)) == tag_delay(g(elem(j)), {delay, 0}))
     ));
 
-    /*
-    // This macro ensures that the upstream MUST output.
-    define is_definitely_triggered_by_physical_connection(downstream, upstream : id_t,
-        delay : interval_t) : boolean
-    = (forall (i : integer) :: in_range(i) ==>
-        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
-            && id(elem(j)) == upstream 
-            && tag_earlier(g(elem(j)), g(elem(i)))
-            && (forall (a : integer) :: in_range(a) ==>
-                id(elem(a)) == upstream ==> (exists (b : integer) :: in_range(b)
-                    && id(elem(b)) == downstream 
-                    && tag_earlier(g(elem(a)), g(elem(b)))
-                    && g(elem(j)) == g(elem(a)) && g(elem(i)) == g(elem(b))
-                )
-            )
-        )
-    ); 
-    */
-
     // A reaction is triggered by 2 inputs.
     define is_triggered_by_2(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
     = (forall (i : integer) :: in_range(i) ==>
@@ -797,12 +768,12 @@ module main {
     axiom(is_definitely_triggered_by_logical_connection(im1_2, c1_1, logical_delay(c1_1, im1_2)));
 
     // im1_3
-    axiom(is_definitely_triggered_by_logical_connection(im1_3, im2_2, logical_delay(im2_2, im1_3)));
-    // axiom(is_definitely_triggered_by_physical_connection(im1_3, im2_2));
+    // axiom(is_definitely_triggered_by_logical_connection(im1_3, im2_2, logical_delay(im2_2, im1_3)));
+    axiom(is_definitely_triggered_by_physical_connection(im1_3, im2_2));
 
     // im1_4
-    axiom(is_definitely_triggered_by_2_logical_connections(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
-    // axiom(is_definitely_triggered_by_logical_physical_connections(im1_4, c1_2, im2_1, logical_delay(c1_2, im1_4)));
+    // axiom(is_definitely_triggered_by_2_logical_connections(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
+    axiom(is_definitely_triggered_by_logical_physical_connections(im1_4, c1_2, im2_1, logical_delay(c1_2, im1_4)));
 
 
     // c2_1
@@ -822,67 +793,13 @@ module main {
     axiom(is_definitely_triggered_by_logical_connection(im2_2, c2_1, logical_delay(c2_1, im2_2)));
 
     // im2_3
-    axiom(is_definitely_triggered_by_logical_connection(im2_3, im1_2, logical_delay(im1_2, im2_3)));
-    // axiom(is_definitely_triggered_by_physical_connection(im2_3, im1_2));
-
-    // im2_4
-    axiom(is_definitely_triggered_by_2_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4),
-    logical_delay(c2_2, im2_4)));
-    // axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(c2_2, im2_4)));
-
-
-
-
-
-    /*
-
-
-    // axiom(is_definitely_triggered_by_2(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
-    
-    axiom(is_triggered_by_unconnected_port(c2_1));
-    axiom(is_triggered_by_physical_action(c2_2));
-    axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
-
-    // FIXME: logical_action definition works but logical connection doesn't ???
-    // Looks like the HB ordering with same time tag across different reactors is not defined.
-    axiom(is_definitely_triggered_by_logical_connection(im2_1, c2_2, logical_delay(c2_2, im2_1)));
-
-    axiom(is_definitely_triggered_by_logical_connection(im2_2, c2_1, logical_delay(c2_1, im2_2)));
-
     // axiom(is_definitely_triggered_by_logical_connection(im2_3, im1_2, logical_delay(im1_2, im2_3)));
     axiom(is_definitely_triggered_by_physical_connection(im2_3, im1_2));
-    // axiom(is_definitely_triggered_by_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4), logical_delay(c2_2, im2_4)));
-    axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(im1_1, im2_4)));
-    */
 
-    /****************************
-     * Connectivity graph order *
-     ****************************/
-    /*
-    define precedes(e1, e2 : id_t) : boolean
-    = forall (i, j : integer) :: (in_range(i) && in_range(j))
-        ==> ((id(elem(i)) == e1 && id(elem(j)) == e2 
-            && tag_same(g(elem(i)), g(elem(j)))) 
-            ==> i < j);
-    */
+    // im2_4
+    // axiom(is_definitely_triggered_by_2_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4), logical_delay(c2_2, im2_4)));
+    axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(c2_2, im2_4)));
 
-    // Specify connections in the connectivity graph.
-    // axiom(precedes(c1_2, im1_1));
-
-    // axiom(precedes(c1_1, im1_2));
-    // axiom(precedes(c1_2, im1_4));
-    // axiom(precedes(im1_1, im2_4));
-    // axiom(precedes(im1_2, im2_3));
-    // axiom(precedes(im1_3, c1_3));
-    // axiom(precedes(im1_4, c1_3));
-
-    // axiom(precedes(c2_1, im2_2));
-    // axiom(precedes(c2_2, im2_1));
-    // axiom(precedes(c2_2, im2_4));
-    // axiom(precedes(im2_1, im1_4));
-    // axiom(precedes(im2_2, im1_3));
-    // axiom(precedes(im2_3, c2_3));
-    // axiom(precedes(im2_4, c2_3));
 
     /*********
      * Debug *
