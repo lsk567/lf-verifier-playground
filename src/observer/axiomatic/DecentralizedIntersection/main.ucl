@@ -65,13 +65,6 @@ module main {
             else inf());
     
     define tag_delay(t : tag_t, i : interval_t) : tag_t
-    /*
-    = if (!isInf(t) && pi1(i) == 0 && !isInf(i))
-        then { pi1(t), pi2(t) + 1 } // microstep delay
-        else ( if (!isInf(t) && pi1(i) > 0 && !isInf(i))
-            then { pi1(t) + pi1(i), 0 }
-            else inf());
-    */
     = if (!isInf(t) && !isInf(i))
         then { pi1(t) + pi1(i), pi2(t) + pi2(i) }
         else inf();
@@ -250,6 +243,126 @@ module main {
     )
     );
 
+    // Return true if two events occur on the same reactor.
+    define same_reactor(e1, e2 : event_t) : boolean
+    = (
+    (
+        id(e1) == c1_1 
+        || id(e1) == c1_2
+        || id(e1) == c1_3
+    ) && (
+        id(e2) == c1_1 
+        || id(e2) == c1_2
+        || id(e2) == c1_3
+    )
+    )
+    ||
+    (
+    (
+        id(e1) == im1_1
+        || id(e1) == im1_2
+        || id(e1) == im1_3
+        || id(e1) == im1_4
+    ) && (
+        id(e2) == im1_1
+        || id(e2) == im1_2
+        || id(e2) == im1_3
+        || id(e2) == im1_4
+    )
+    )
+    ||
+    (
+    (
+        id(e1) == c2_1 
+        || id(e1) == c2_2
+        || id(e1) == c2_3
+    ) && (
+        id(e2) == c2_1 
+        || id(e2) == c2_2
+        || id(e2) == c2_3
+    )
+    )
+    ||
+    (
+    (
+        id(e1) == im2_1
+        || id(e1) == im2_2
+        || id(e1) == im2_3
+        || id(e1) == im2_4
+    ) && (
+        id(e2) == im2_1
+        || id(e2) == im2_2
+        || id(e2) == im2_3
+        || id(e2) == im2_4
+    )
+    );
+
+    define is_connected(e1, e2 : event_t) : boolean
+    = (
+        id(e1) == c1_1
+        && id(e2) == im1_2
+    )
+    ||
+    (
+        id(e1) == c1_2
+        && (
+            id(e2) == im1_1
+            || id(e2) == im1_4
+        )
+    )
+    ||
+    (
+        id(e1) == im1_1
+        && id(e2) == im2_4
+    )
+    ||
+    (
+        id(e1) == im1_2
+        && id(e2) == im2_3
+    )
+    ||
+    (
+        (
+            id(e1) == im1_3
+            || id(e1) == im1_4
+        )
+        && id(e2) == c1_3
+    )
+    /////// c2
+    ||
+    (
+        id(e1) == c2_1
+        && id(e2) == im2_2
+    )
+    ||
+    (
+        id(e1) == c2_2
+        && (
+            id(e2) == im2_1
+            || id(e2) == im2_4
+        )
+    )
+    ||
+    (
+        id(e1) == im2_1
+        && id(e2) == im1_4
+    )
+    ||
+    (
+        id(e1) == im2_2
+        && id(e2) == im1_3
+    )
+    ||
+    (
+        (
+            id(e1) == im2_3
+            || id(e1) == im2_4
+        )
+        && id(e2) == c2_3
+    )
+    ;
+
+    // FIXME: to deprecate and replace by is_connected.
     // Return true if two events occur on different federates.
     define _connected_id_diff_fed(e1, e2 : event_t) : boolean
     = (id(e1) == im1_1 && id(e2) == im2_4)
@@ -263,7 +376,12 @@ module main {
     // TODO: account for nested reactors in federates.
     define _hb_same_fed(_e1, _e2 : event_t) : boolean
     = tag_earlier(g(_e1), g(_e2)) ||
-        (tag_same(g(_e1), g(_e2)) && priority(id(_e1)) < priority(id(_e2)));
+        (tag_same(g(_e1), g(_e2)) && (
+            (same_reactor(_e1, _e2) && priority(id(_e1)) < priority(id(_e2)))
+            // This is essentially checking counterfactual causality
+            // within the same federate.
+            || (!same_reactor(_e1, _e2) && is_connected(_e1, _e2))
+        ));
     
     // Return true if e1 happened before e2 in different federates
     // and e1 has a connection to e2. This check uses the time tags
@@ -283,7 +401,16 @@ module main {
         // If two events belong to different federates,
         // check if a connection is present.
         // This is uni-directional.
-        || (_connected_id_diff_fed(_e1, _e2) && _hb_diff_fed(_e1, _e2));
+        //
+        // This is essentially checking cc across federates.
+        // We need to check cc within a federate, since with
+        // nested reactors, there is a partial order within
+        // the federate too.
+        // 
+        // Previous:
+        // || (_connected_id_diff_fed(_e1, _e2) && _hb_diff_fed(_e1, _e2));
+        // Now:
+        || (!_id_same_fed(_e1, _e2) && is_connected(_e1, _e2) && _hb_diff_fed(_e1, _e2));
     
 
     /**
@@ -654,54 +781,108 @@ module main {
     /*******************************
      * Application-specific axioms *
      *******************************/
+    // c1_1
     axiom(is_triggered_by_unconnected_port(c1_1));
+
+    // c1_2
     axiom(is_triggered_by_physical_action(c1_2));
+
+    // c1_3
     axiom(is_definitely_triggered_by_2_logical_connections(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
-    axiom(is_definitely_triggered_by_logical_connection(im1_1, c1_2, logical_delay(c1_2, im1_1)));
+
+    // im1_1
+    axiom(is_definitely_triggered_by_logical_action(im1_1, c1_2, logical_delay(c1_2, im1_1)));
+
+    // im1_2
     axiom(is_definitely_triggered_by_logical_connection(im1_2, c1_1, logical_delay(c1_1, im1_2)));
-    // axiom(is_definitely_triggered_by_logical_connection(im1_3, im2_2, logical_delay(im2_2, im1_3)));
-    axiom(is_definitely_triggered_by_physical_connection(im1_3, im2_2));
+
+    // im1_3
+    axiom(is_definitely_triggered_by_logical_connection(im1_3, im2_2, logical_delay(im2_2, im1_3)));
+    // axiom(is_definitely_triggered_by_physical_connection(im1_3, im2_2));
+
+    // im1_4
+    axiom(is_definitely_triggered_by_2_logical_connections(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
+    // axiom(is_definitely_triggered_by_logical_physical_connections(im1_4, c1_2, im2_1, logical_delay(c1_2, im1_4)));
+
+
+    // c2_1
+    axiom(is_triggered_by_unconnected_port(c2_1));
+
+    // c2_2
+    axiom(is_triggered_by_physical_action(c2_2));
+
+    // c2_3
+    axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3),
+    logical_delay(im2_4, c2_3)));
+
+    // im2_1
+    axiom(is_definitely_triggered_by_logical_action(im2_1, c2_2, logical_delay(c2_2, im2_1)));
+
+    // im2_2
+    axiom(is_definitely_triggered_by_logical_connection(im2_2, c2_1, logical_delay(c2_1, im2_2)));
+
+    // im2_3
+    axiom(is_definitely_triggered_by_logical_connection(im2_3, im1_2, logical_delay(im1_2, im2_3)));
+    // axiom(is_definitely_triggered_by_physical_connection(im2_3, im1_2));
+
+    // im2_4
+    axiom(is_definitely_triggered_by_2_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4),
+    logical_delay(c2_2, im2_4)));
+    // axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(c2_2, im2_4)));
+
+
+
+
+
+    /*
+
+
     // axiom(is_definitely_triggered_by_2(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
-    axiom(is_definitely_triggered_by_logical_physical_connections(im1_4, c1_2, im2_1, logical_delay(c1_2, im1_4)));
     
     axiom(is_triggered_by_unconnected_port(c2_1));
     axiom(is_triggered_by_physical_action(c2_2));
     axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
 
     // FIXME: logical_action definition works but logical connection doesn't ???
+    // Looks like the HB ordering with same time tag across different reactors is not defined.
     axiom(is_definitely_triggered_by_logical_connection(im2_1, c2_2, logical_delay(c2_2, im2_1)));
 
     axiom(is_definitely_triggered_by_logical_connection(im2_2, c2_1, logical_delay(c2_1, im2_2)));
+
     // axiom(is_definitely_triggered_by_logical_connection(im2_3, im1_2, logical_delay(im1_2, im2_3)));
     axiom(is_definitely_triggered_by_physical_connection(im2_3, im1_2));
     // axiom(is_definitely_triggered_by_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4), logical_delay(c2_2, im2_4)));
     axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(im1_1, im2_4)));
+    */
 
     /****************************
      * Connectivity graph order *
      ****************************/
+    /*
     define precedes(e1, e2 : id_t) : boolean
-    = forall (i, j : integer) :: in_range(i) && in_range(j)
-        ==> id(elem(i)) == e1 && id(elem(j)) == e2 
-            && tag_same(g(elem(i)), g(elem(j))) 
-            ==> i < j;
+    = forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> ((id(elem(i)) == e1 && id(elem(j)) == e2 
+            && tag_same(g(elem(i)), g(elem(j)))) 
+            ==> i < j);
+    */
 
     // Specify connections in the connectivity graph.
-    axiom(precedes(c1_1, im1_2));
-    axiom(precedes(c1_2, im1_1));
-    axiom(precedes(c1_2, im1_4));
-    axiom(precedes(im1_1, im2_4));
-    axiom(precedes(im1_2, im2_3));
-    axiom(precedes(im1_3, c1_3));
-    axiom(precedes(im1_4, c1_3));
+    // axiom(precedes(c1_2, im1_1));
 
-    axiom(precedes(c2_1, im2_2));
-    axiom(precedes(c2_2, im2_1));
-    axiom(precedes(c2_2, im2_4));
-    axiom(precedes(im2_1, im1_4));
-    axiom(precedes(im2_2, im1_3));
-    axiom(precedes(im2_3, c2_3));
-    axiom(precedes(im2_4, c2_3));
+    // axiom(precedes(c1_1, im1_2));
+    // axiom(precedes(c1_2, im1_4));
+    // axiom(precedes(im1_1, im2_4));
+    // axiom(precedes(im1_2, im2_3));
+    // axiom(precedes(im1_3, c1_3));
+    // axiom(precedes(im1_4, c1_3));
+
+    // axiom(precedes(c2_1, im2_2));
+    // axiom(precedes(c2_2, im2_1));
+    // axiom(precedes(c2_2, im2_4));
+    // axiom(precedes(im2_1, im1_4));
+    // axiom(precedes(im2_2, im1_3));
+    // axiom(precedes(im2_3, c2_3));
+    // axiom(precedes(im2_4, c2_3));
 
     /*********
      * Debug *
@@ -724,10 +905,76 @@ module main {
     /**************
      * Properties *
      **************/
+    /*****************************************
+     * (a.arrive) /\ X(F(b.arrives))         *
+     *  ==> F((a.grant) /\ X(F(b.grant)))    *
+     *                                       *
+     *****************************************/
+    // Check if the current event is a.arrive.
+    define phi1(modality : integer) : boolean
+    = id(elem(modality)) == c1_2; // a.arrive
+
+    // Check if the current event is b.arrive.
+    define phi2(modality : integer) : boolean
+    = id(elem(modality)) == c2_2; // b.arrive
+    
+    // phi3 := F(phi2)
+    define phi3(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi2(i);
+
+    // phi4 := X(phi3)
+    define phi4(modality : integer) : boolean
+    = phi3(modality+1);
+
+    // phi5 := phi1 /\ phi4
+    define phi5(modality : integer) : boolean
+    = phi1(modality) && phi4(modality);
+
+    // Check if the current event is a.grant.
+    define phi6(modality : integer) : boolean
+    = id(elem(modality)) == c1_3; // a.grant
+
+    // Check if the current event is b.grant.
+    define phi7(modality : integer) : boolean
+    = id(elem(modality)) == c2_3; // b.grant
+    
+    // phi8 := F(phi7)
+    define phi8(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi7(i);
+
+    // phi9 := X(phi8)
+    define phi9(modality : integer) : boolean
+    = phi8(modality+1);
+
+    // phi10 := phi6 /\ phi9
+    define phi10(modality : integer) : boolean
+    = phi6(modality) && phi9(modality);
+
+    // phi11 := F(phi10)
+    define phi11(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi10(i);
+
+    // phi12 := phi5 ==> phi11
+    define phi12(modality : integer) : boolean
+    = phi5(modality) ==> phi11(modality);
+    
+    // phi12 := phi5 ==> phi11
+    define phi13(modality : integer) : boolean
+    = phi5(modality) ==> false;
+
+    // axiom(phi12(0));
+    // axiom(exists_in_trace(v1_1));
+    // axiom(exists_in_trace(v1_2));
+    // property test : false;
+    // property fairness : phi13(0);
 
     // axiom(exists_in_trace(c1_3));
-    axiom(exists_in_trace(im2_1));
+    // axiom(exists_in_trace(im2_1));
     // axiom(id(elem(0)) == im2_1);
+    axiom(exists_in_trace(c1_2));
     property test : false;
     //////////////////////////////////////////////////
      
