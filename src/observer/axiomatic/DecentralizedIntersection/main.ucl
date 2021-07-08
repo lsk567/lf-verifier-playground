@@ -65,6 +65,13 @@ module main {
             else inf());
     
     define tag_delay(t : tag_t, i : interval_t) : tag_t
+    /*
+    = if (!isInf(t) && pi1(i) == 0 && !isInf(i))
+        then { pi1(t), pi2(t) + 1 } // microstep delay
+        else ( if (!isInf(t) && pi1(i) > 0 && !isInf(i))
+            then { pi1(t) + pi1(i), 0 }
+            else inf());
+    */
     = if (!isInf(t) && !isInf(i))
         then { pi1(t) + pi1(i), pi2(t) + pi2(i) }
         else inf();
@@ -660,12 +667,44 @@ module main {
     axiom(is_triggered_by_unconnected_port(c2_1));
     axiom(is_triggered_by_physical_action(c2_2));
     axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
+
+    // FIXME: logical_action definition works but logical connection doesn't ???
     axiom(is_definitely_triggered_by_logical_connection(im2_1, c2_2, logical_delay(c2_2, im2_1)));
+
     axiom(is_definitely_triggered_by_logical_connection(im2_2, c2_1, logical_delay(c2_1, im2_2)));
     // axiom(is_definitely_triggered_by_logical_connection(im2_3, im1_2, logical_delay(im1_2, im2_3)));
     axiom(is_definitely_triggered_by_physical_connection(im2_3, im1_2));
     // axiom(is_definitely_triggered_by_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4), logical_delay(c2_2, im2_4)));
     axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(im1_1, im2_4)));
+
+    /****************************
+     * Connectivity graph order *
+     ****************************/
+    define precedes(e1, e2 : id_t) : boolean
+    = forall (i, j : integer) :: in_range(i) && in_range(j)
+        ==> id(elem(i)) == e1 && id(elem(j)) == e2 
+            && tag_same(g(elem(i)), g(elem(j))) 
+            ==> i < j;
+
+    // Specify connections in the connectivity graph.
+    axiom(precedes(c1_1, im1_2));
+    axiom(precedes(c1_2, im1_1));
+    axiom(precedes(c1_2, im1_4));
+    axiom(precedes(im1_1, im2_4));
+    axiom(precedes(im1_2, im2_3));
+    axiom(precedes(im1_3, c1_3));
+    axiom(precedes(im1_4, c1_3));
+
+
+    axiom(precedes(c2_1, im2_2));
+    axiom(precedes(c2_2, im2_1));
+    axiom(precedes(c2_2, im2_4));
+    axiom(precedes(im2_1, im1_4));
+    axiom(precedes(im2_2, im1_3));
+    axiom(precedes(im2_3, c2_3));
+    axiom(precedes(im2_4, c2_3));
+
+    // axiom(precedes(c2_2, im2_1));
 
     /*********
      * Debug *
@@ -689,7 +728,9 @@ module main {
      * Properties *
      **************/
 
-    axiom(exists_in_trace(c1_1));
+    // axiom(exists_in_trace(c1_3));
+    axiom(exists_in_trace(im2_1));
+    // axiom(id(elem(0)) == im2_1);
     property test : false;
     //////////////////////////////////////////////////
      
