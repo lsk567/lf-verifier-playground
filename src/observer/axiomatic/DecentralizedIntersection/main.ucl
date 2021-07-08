@@ -759,21 +759,22 @@ module main {
     axiom(is_triggered_by_physical_action(c1_2));
 
     // c1_3
-    axiom(is_definitely_triggered_by_2_logical_connections(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
+    // axiom(is_definitely_triggered_by_2_logical_connections(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
+    axiom(is_definitely_triggered_by_2_logical_actions(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
 
     // im1_1
-    axiom(is_definitely_triggered_by_logical_action(im1_1, c1_2, logical_delay(c1_2, im1_1)));
+    axiom(is_definitely_triggered_by_logical_connection(im1_1, c1_2, logical_delay(c1_2, im1_1)));
 
     // im1_2
     axiom(is_definitely_triggered_by_logical_connection(im1_2, c1_1, logical_delay(c1_1, im1_2)));
 
     // im1_3
-    // axiom(is_definitely_triggered_by_logical_connection(im1_3, im2_2, logical_delay(im2_2, im1_3)));
-    axiom(is_definitely_triggered_by_physical_connection(im1_3, im2_2));
+    axiom(is_definitely_triggered_by_logical_connection(im1_3, im2_2, logical_delay(im2_2, im1_3)));
+    // axiom(is_definitely_triggered_by_physical_connection(im1_3, im2_2));
 
     // im1_4
-    // axiom(is_definitely_triggered_by_2_logical_connections(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
-    axiom(is_definitely_triggered_by_logical_physical_connections(im1_4, c1_2, im2_1, logical_delay(c1_2, im1_4)));
+    axiom(is_definitely_triggered_by_2_logical_connections(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
+    // axiom(is_definitely_triggered_by_logical_physical_connections(im1_4, c1_2, im2_1, logical_delay(c1_2, im1_4)));
 
 
     // c2_1
@@ -783,22 +784,22 @@ module main {
     axiom(is_triggered_by_physical_action(c2_2));
 
     // c2_3
-    axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3),
-    logical_delay(im2_4, c2_3)));
+    // axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
+    axiom(is_definitely_triggered_by_2_logical_actions(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
 
     // im2_1
-    axiom(is_definitely_triggered_by_logical_action(im2_1, c2_2, logical_delay(c2_2, im2_1)));
+    axiom(is_definitely_triggered_by_logical_connection(im2_1, c2_2, logical_delay(c2_2, im2_1)));
 
     // im2_2
     axiom(is_definitely_triggered_by_logical_connection(im2_2, c2_1, logical_delay(c2_1, im2_2)));
 
     // im2_3
-    // axiom(is_definitely_triggered_by_logical_connection(im2_3, im1_2, logical_delay(im1_2, im2_3)));
-    axiom(is_definitely_triggered_by_physical_connection(im2_3, im1_2));
+    axiom(is_definitely_triggered_by_logical_connection(im2_3, im1_2, logical_delay(im1_2, im2_3)));
+    // axiom(is_definitely_triggered_by_physical_connection(im2_3, im1_2));
 
     // im2_4
-    // axiom(is_definitely_triggered_by_2_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4), logical_delay(c2_2, im2_4)));
-    axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(c2_2, im2_4)));
+    axiom(is_definitely_triggered_by_2_logical_connections(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4), logical_delay(c2_2, im2_4)));
+    // axiom(is_definitely_triggered_by_logical_physical_connections(im2_4, c2_2, im1_1, logical_delay(c2_2, im2_4)));
 
 
     /*********
@@ -871,8 +872,16 @@ module main {
 
     // phi11 := F(phi10)
     define phi11(modality : integer) : boolean
+    = exists (j : integer) :: in_range(j) && j >= modality
+        && phi10(j);
+
+    define phi11_a(modality : integer) : boolean
     = exists (i : integer) :: in_range(i) && i >= modality
-        && phi10(i);
+        && phi6(i);
+
+    define phi11_b(modality : integer) : boolean
+    = exists (j : integer) :: in_range(j) && j >= modality
+        && phi9(j);
 
     // phi12 := phi5 ==> phi11
     define phi12(modality : integer) : boolean
@@ -886,13 +895,31 @@ module main {
     // axiom(exists_in_trace(v1_1));
     // axiom(exists_in_trace(v1_2));
     // property test : false;
-    // property fairness : phi13(0);
+    
+    // property fairness : phi12(0);
+
+    // Why no model?
+    // axiom(phi11(0));
+    // axiom(phi11_b(0)); // not working. After changing quantified var name, works!
+    // axiom(phi8(0)); // ok
+    // axiom(phi9(0)); // ok 
+    
+    /* UCLID BUG! */
+    // When there is a redundant variable i being used in quantified formulas,
+    // the solver automatically returns unsat.
+    // Solution: avoid conflict!
+    //
+    // axiom(exists (i : integer) :: in_range(i) && i >= 0 && phi9(i)); // Does not work!!
+    
+    // axiom(exists (j : integer) :: in_range(j) && j >= 0 && phi9(j)); // works!!
+    property test : false;
 
     // axiom(exists_in_trace(c1_3));
     // axiom(exists_in_trace(im2_1));
     // axiom(id(elem(0)) == im2_1);
-    axiom(exists_in_trace(c1_2));
-    property test : false;
+    // axiom(exists_in_trace(c1_2));
+    // axiom(exists_in_trace(c2_2));
+    // property test : false;
     //////////////////////////////////////////////////
      
     control {
