@@ -1,0 +1,597 @@
+/*******************************
+ * Auto-generated UCLID5 model *
+ ******************************/
+ 
+module main {
+ 
+    /*******************************
+     * Time and Related Operations *
+     ******************************/
+    type timestamp_t = integer; // Unit is nanoseconds
+    type microstep_t = integer;
+    type tag_t = {
+        timestamp_t,
+        microstep_t
+    };
+    // FIXME: in LF, the interval is an integer.
+    type interval_t  = tag_t;
+    
+    // Projection macros
+    define pi1(t : tag_t)   : timestamp_t   = t._1;         // Get timestamp from tag
+    define pi2(t : tag_t)   : microstep_t   = t._2;         // Get microstep from tag
+    
+    // Interval constructor
+    define zero() : interval_t
+    = {0, 0};
+    define startup() : interval_t
+    = zero();
+    define mstep() : interval_t
+    = {0, 1};
+    define nsec(t : integer) : interval_t
+    = {t, 0};
+    define usec(t : integer) : interval_t
+    = {t * 1000, 0};
+    define msec(t : integer) : interval_t
+    = {t * 1000000, 0};
+    define sec(t : integer) : interval_t
+    = {t * 1000000000, 0};
+    define inf() : interval_t
+    = {-1, 0};
+    
+    // Helper function
+    define isInf(i : interval_t) : boolean
+    = pi1(i) < 0;
+    
+    // Tag comparison
+    define tag_later(t1 : tag_t, t2 : tag_t) : boolean
+    = pi1(t1) > pi1(t2)
+        || (pi1(t1) == pi1(t2) && pi2(t1) > pi2(t2))
+        || (isInf(t1) && !isInf(t2));
+    
+    define tag_same(t1 : tag_t, t2 : tag_t) : boolean
+    = t1 == t2;
+    
+    define tag_earlier(t1 : tag_t, t2 : tag_t) : boolean
+    = pi1(t1) < pi1(t2)
+        || (pi1(t1) == pi1(t2) && pi2(t1) < pi2(t2))
+        || (!isInf(t1) && isInf(t2));
+    
+    // Tag algebra
+    define tag_schedule(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && pi1(i) == 0 && !isInf(i))
+        then { pi1(t), pi2(t) + 1 } // microstep delay
+        else ( if (!isInf(t) && pi1(i) > 0 && !isInf(i))
+            then { pi1(t) + pi1(i), 0 }
+            else inf());
+    
+    define tag_delay(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && !isInf(i))
+        then { pi1(t) + pi1(i), pi2(t) + pi2(i) }
+        else inf();
+    
+    // Only consider timestamp for now.
+    define tag_diff(t1, t2: tag_t) : interval_t
+    = if (!isInf(t1) && !isInf(t2))
+        then { pi1(t1) - pi1(t2), pi2(t1) - pi2(t2) }
+        else inf();
+     
+    /**********************************
+     * Reactions & connectivity graph *
+     *********************************/
+    
+    //////////////////////////
+    // Application Specific
+    // Element IDs
+    type id_t = enum {  
+        NULL,                           // NULL 
+        im1_1, im1_2, im1_3, im1_4,     // IM reactions
+        im2_1, im2_2, im2_3, im2_4,     // IM reactions
+        c1_1, c1_2, c1_3,
+        c2_1, c2_2, c2_3
+    };
+    //////////////////////////
+     
+    /*****************
+     * Trace Element *
+     ****************/
+    type event_t = { id_t, tag_t };
+    
+    // Projection macros
+    define id(e : event_t) : id_t     = e._1;
+    define g(e : event_t) : tag_t     = e._2;
+    
+    define isNULL(e : event_t) : boolean = id(e) == NULL;
+     
+    /********************
+     * Trace Definition *
+     *******************/
+    const START : integer = 0;
+    const END : integer = 9;
+    
+    define in_range(num : integer) : boolean
+    = num >= START && num <= END;
+    
+    type step_t = integer;
+    type trace_t = { 
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t
+    };
+    
+    define get(tr : trace_t, i : step_t) : event_t 
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else (
+                if (i == 3) then tr._4 else (
+                    if (i == 4) then tr._5 else (
+                        if (i == 5) then tr._6 else (
+                            if (i == 6) then tr._7 else (
+                                if (i == 7) then tr._8 else (
+                                    if (i == 8) then tr._9 else (
+                                        if (i == 9) then tr._10 else (
+                                            { NULL, inf() }
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
+    // Mark the start of the trace.
+    var start : timestamp_t;
+    assume(start >= pi1(zero()));
+     
+    // Declare the trace
+    // The counterexample reflects a particular frame of reference.
+    var trace : trace_t;
+    
+    // Helper macro that returns an element based on index
+    define elem(i : integer) : event_t
+    = get(trace, i);
+     
+    /************
+     * Topology *
+     ************/
+    // Return reaction priority.
+    define priority(i : id_t) : integer
+    = if (i == c1_1 || i == c2_1 || i == im1_1 || i == im2_1) then 1 else (
+        if (i == c1_2 || i == c2_2 || i == im1_2 || i == im2_2) then 2 else (
+            if (i == c1_3 || i == c2_3 || i == im1_3 || i == im2_3) then 3 else (
+                if (i == im1_4 || i == im2_4) then 4 else
+                    999 )));
+     
+    // Return logical delay in a connection.
+    define logical_delay(i1, i2 : id_t) : interval_t
+    = if (
+        (i1 == c1_1 && i2 == im1_2)
+        || (i1 == c1_2 && i2 == im1_1)
+        || (i1 == c1_2 && i2 == im1_4)
+        || (i1 == im1_1 && i2 == im2_4)
+        || (i1 == im1_2 && i2 == im2_3)
+        || (i1 == im1_3 && i2 == c1_3)
+        || (i1 == im1_4 && i2 == c1_3)
+        
+        || (i1 == c2_1 && i2 == im2_2)
+        || (i1 == c2_2 && i2 == im2_1)
+        || (i1 == c2_2 && i2 == im2_4)
+        || (i1 == im2_1 && i2 == im1_4)
+        || (i1 == im2_2 && i2 == im1_3)
+        || (i1 == im2_3 && i2 == c2_3)
+        || (i1 == im2_4 && i2 == c2_3)
+    ) then zero()
+    else inf();
+
+    // Timer-related constants and macros.
+    const NUM_TIMERS : integer = 0;
+
+    define timer_period(i : id_t) : interval_t
+    = inf();
+
+    define timer_offset(i : id_t) : interval_t
+    = inf();
+
+    // Return true if two events occur on the same federate.
+    define _id_same_fed(e1, e2 : event_t) : boolean
+    = (
+    (
+        id(e1) == c1_1 
+        || id(e1) == c1_2
+        || id(e1) == c1_3
+        || id(e1) == im1_1
+        || id(e1) == im1_2
+        || id(e1) == im1_3
+        || id(e1) == im1_4
+    ) && (
+        id(e2) == c1_1 
+        || id(e2) == c1_2
+        || id(e2) == c1_3
+        || id(e2) == im1_1
+        || id(e2) == im1_2
+        || id(e2) == im1_3
+        || id(e2) == im1_4
+    )
+    )
+    ||
+    (
+    (
+        id(e1) == c2_1 
+        || id(e1) == c2_2
+        || id(e1) == c2_3
+        || id(e1) == im2_1
+        || id(e1) == im2_2
+        || id(e1) == im2_3
+        || id(e1) == im2_4
+    ) && (
+        id(e2) == c2_1 
+        || id(e2) == c2_2
+        || id(e2) == c2_3
+        || id(e2) == im2_1
+        || id(e2) == im2_2
+        || id(e2) == im2_3
+        || id(e2) == im2_4
+    )
+    );
+
+    // Return true if two events occur on different federates.
+    define _connected_id_diff_fed(e1, e2 : event_t) : boolean
+    = (id(e1) == im1_1 && id(e2) == im2_4)
+        || (id(e1) == im2_1 && id(e2) == im1_4)
+        || (id(e1) == im1_2 && id(e2) == im2_3)
+        || (id(e1) == im2_2 && id(e2) == im1_3);
+
+    // Return true if e1 happened before e2 in the same federate,
+    // by comparing the tags and the priorities of the two events.
+    //
+    // TODO: account for nested reactors in federates.
+    define _hb_same_fed(_e1, _e2 : event_t) : boolean
+    = tag_earlier(g(_e1), g(_e2)) ||
+        (tag_same(g(_e1), g(_e2)) && priority(id(_e1)) < priority(id(_e2)));
+    
+    // Return true if e1 happened before e2 in different federates
+    // and e1 has a connection to e2. This check uses the time tags
+    // and the logical delay in the connection.
+    //
+    // FIXME: account for physical connections.
+    define _hb_diff_fed(_e1, _e2 : event_t) : boolean
+    = tag_earlier(tag_delay(g(_e1), logical_delay(id(_e1), id(_e2))), g(_e2))
+        || tag_same(tag_delay(g(_e1), logical_delay(id(_e1), id(_e2))), g(_e2));
+    
+    // Check the happened-before relation between two immediate events.
+    define _hb(_e1, _e2 : event_t) : boolean
+    =   // If two events belong to the same federate,
+        // determine hb via tags.
+        // This is bi-directional.
+        (_id_same_fed(_e1, _e2) && _hb_same_fed(_e1, _e2))
+        // If two events belong to different federates,
+        // check if a connection is present.
+        // This is uni-directional.
+        || (_connected_id_diff_fed(_e1, _e2) && _hb_diff_fed(_e1, _e2));
+    
+
+    /**
+     * UCLID5 Bug:
+     * When g is being redefined in the existential clause,
+     * the compiler returns
+     *
+     * ```
+     * Type error line 20: Cannot apply g, which is of type integer.
+     * define pi1(t : tag_t)   : timestamp_t   = t._1;         // Get timestamp from tag
+     * ```
+     *
+     * which is very uninformative. 
+     */
+
+    // HB path with 1 ed_ge
+    define hb_1(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b : integer) :: in_range(a) && in_range(b) 
+        // Check if a path between e1 and e2 exists.
+        && elem(a) == e1 && elem(b) == e2
+        && _hb(elem(a), elem(b))
+        && a < b; 
+    
+    // HB path with 2 ed_ges
+    define hb_2(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c : integer) :: elem(a) == e1 && elem(c) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c))
+        && a < b && b < c;
+    
+    // HB path with 3 ed_ges
+    define hb_3(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d : integer) :: elem(a) == e1 && elem(d) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && a < b && b < c && c < d;
+    
+    // HB path with 4 ed_ges
+    define hb_4(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d, e : integer) :: elem(a) == e1 && elem(e) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && _hb(elem(d), elem(e))
+        && a < b && b < c && c < d && d < e;
+
+    // HB path with 5 ed_ges
+    define hb_5(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d, e, f : integer) :: elem(a) == e1 && elem(f) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && _hb(elem(d), elem(e)) && _hb(elem(e), elem(f))
+        && a < b && b < c && c < d && d < e && e < f;
+
+    // HB path with 6 ed_ges
+    define hb_6(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d, e, f, _g : integer) :: elem(a) == e1 && elem(_g) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && _hb(elem(d), elem(e)) && _hb(elem(e), elem(f)) && _hb(elem(f), elem(_g))
+        && a < b && b < c && c < d && d < e && e < f && f < _g;
+
+    // HB path with 7 ed_ges
+    define hb_7(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d, e, f, _g, h : integer) :: elem(a) == e1 && elem(h) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && _hb(elem(d), elem(e)) && _hb(elem(e), elem(f)) && _hb(elem(f), elem(_g))
+        && _hb(elem(_g), elem(h))
+        && a < b && b < c && c < d && d < e && e < f && f < _g && _g < h;
+
+    // HB path with 8 ed_ges
+    define hb_8(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d, e, f, _g, h, i : integer) :: elem(a) == e1 && elem(i) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && _hb(elem(d), elem(e)) && _hb(elem(e), elem(f)) && _hb(elem(f), elem(_g))
+        && _hb(elem(_g), elem(h)) && _hb(elem(h), elem(i))
+        && a < b && b < c && c < d && d < e && e < f && f < _g && _g < h && h < i;
+
+    // HB path with 9 ed_ges
+    define hb_9(e1, e2 : event_t) : boolean
+    // Link e1, e2 to the start and end of a path.
+    = exists (a, b, c, d, e, f, _g, h, i, j : integer) :: elem(a) == e1 && elem(j) == e2 
+        // Check if a path between e1 and e2 exists.
+        && _hb(elem(a), elem(b)) && _hb(elem(b), elem(c)) && _hb(elem(c), elem(d))
+        && _hb(elem(d), elem(e)) && _hb(elem(e), elem(f)) && _hb(elem(f), elem(_g))
+        && _hb(elem(_g), elem(h)) && _hb(elem(h), elem(i)) && _hb(elem(i), elem(j))
+        && a < b && b < c && c < d && d < e && e < f && f < _g && _g < h && h < i && i < j;
+
+    // Transitive "happened-before" definition
+    define hb(e1, e2 : event_t) : boolean
+    = hb_1(e1, e2) || hb_2(e1, e2) || hb_3(e1, e2)
+        || hb_4(e1, e2) || hb_5(e1, e2) || hb_6(e1, e2)
+        || hb_7(e1, e2) || hb_8(e1, e2) || hb_9(e1, e2);
+
+    /***************************
+     * Topological Abstraction *
+     ***************************/
+
+    define is_multiple_of(a, b : integer) : boolean
+    = exists (c : integer) :: b * c == a;
+    
+    define is_closest_starting_point(t : tag_t, period : integer, offset : integer) : boolean
+    = (exists (c : integer) :: (period * c) + offset == pi1(t)
+        // Tick at the next valid instant.
+        && (period * (c - 1) + offset) < start)     
+        // Timer always has mstep of 0.
+        && pi2(t) == 0;                           
+    
+    // first & last in trace
+    define first(e : event_t) : boolean
+    = !(exists (i : integer) :: in_range(i) && id(elem(i)) == id(e) && tag_earlier(g(elem(i)), g(e))); 
+    
+    define last(e : event_t) : boolean
+    = !(exists (i : integer) :: in_range(i) && id(elem(i)) == id(e) && tag_later(g(elem(i)), g(e))); 
+    
+    define is_triggered_by_startup(_id : id_t) : boolean
+    = // If startup is within frame, put the events in the trace.
+    ((start == 0) ==> (exists (i : integer) :: in_range(i)
+        && id(elem(i)) == _id && tag_same(g(elem(i)), startup())))
+    // Can only appear once.
+    && !(exists (j : integer) :: in_range(j) && id(elem(j)) == _id
+        && !tag_same(g(elem(j)), startup()));
+    
+    // Can directly use index as HB since this only applies to events
+    // on the same federate.
+    define _is_latest_invocation_in_same_fed_wrt_(a, b : integer) : boolean
+    = !(exists (c : integer) :: in_range(c) 
+        && id(elem(c)) == id(elem(a)) && a < c && c < b);
+    
+    define is_triggered_by_timer(_id : id_t) : boolean
+    =   // 1. If the initial event is within frame, show it.
+        (exists (i : integer) :: in_range(i)
+        && id(elem(i)) == _id
+        && is_closest_starting_point(g(elem(i)), pi1(timer_period(_id)),
+            pi1(timer_offset(_id))))
+        // 2. The SPACING between two consecutive timers is the period.
+        && (forall (i, j : integer) :: (in_range(i) && in_range(j) && i < j
+            && id(elem(i)) == _id && id(elem(j)) == _id
+            // ...and there does not exist a 3rd invocation in between
+            && !(exists (k : integer) :: id(elem(k)) == _id && i < k && k < j))
+                ==> g(elem(j)) == tag_schedule(g(elem(i)), timer_period(_id)))
+        // 3. There does not exist other events in the same federate that 
+        // differ by the last timer invocation by g(last_timer) + period.
+        // In other words, this axiom ensures a timer fires when it needs to.
+        //
+        // a := index of the offending event that occupy the spot of a timer tick.
+        // b := index of non-timer event on the same federate
+        // both in_range's are needed due to !(exists), which turns into a forall.
+        && !(exists (b, a : integer) :: in_range(a) && in_range(b)
+            && id(elem(b)) != _id
+            && _id_same_fed(elem(b), {_id, zero()})
+            && id(elem(a)) == _id
+            && (_is_latest_invocation_in_same_fed_wrt_(a, b)
+                && tag_later(g(elem(b)), tag_schedule(g(elem(a)), timer_period(_id))) ));
+
+    // Triggered by physical action means there is no constraint.
+    define is_triggered_by_physical_action(_id : id_t) : boolean
+    = true;
+    
+    // Triggered by unconnected port means there is no constraint.
+    define is_triggered_by_unconnected_port(_id : id_t) : boolean
+    = true;
+
+    // This includes the possibility that upstream does NOT output.
+    define is_triggered_by(downstream, upstream : id_t, delay : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    );
+    
+    // A reaction is triggered by 2 inputs.
+    define is_triggered_by_2(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == down ==> (
+            (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up1 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+            || (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up2 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay2))
+    ));
+
+    // One of the two reactions must output.
+    define is_definitely_triggered_by_2(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == down ==> (
+            (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up1 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+            || (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == up2 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay2))
+    )) &&
+    (forall (j : integer) :: in_range(j) ==>
+        (
+            (id(elem(j)) == up1 ==> (exists (i : integer) :: in_range(i)
+                && id(elem(i)) == down
+                && g(elem(i)) == tag_schedule(g(elem(j)), delay)))
+            &&
+            (id(elem(j)) == up2 ==> (exists (i : integer) :: in_range(i)
+                && id(elem(i)) == down
+                && g(elem(i)) == tag_schedule(g(elem(j)), delay2)))
+        )
+    );
+
+    // This macro ensures that the upstream MUST output.
+    define is_definitely_triggered_by(downstream, upstream : id_t,
+        delay : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    ) && 
+    (forall (j : integer) :: in_range(j) ==>
+        id(elem(j)) == upstream ==> (exists (i : integer) :: in_range(i)
+            && id(elem(i)) == downstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    );
+    
+    define is_in_trace(_id : id_t) : boolean
+    = (exists (i : integer) :: in_range(i) && id(elem(i)) == _id);
+
+    /*********************
+     * Reactor Semantics *
+     *********************/
+
+    // [Important] The trace should respect the HB relation.
+    // In this case, there is no constraint on i, j when hb
+    // fails to establish on both direction (def. of concurrent).
+    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> (_hb(elem(i), elem(j)) ==> i < j));
+    
+    // All microsteps are positive
+    axiom(forall (i : integer) :: in_range(i)
+        ==> pi2(g(elem(i))) >= 0);
+    
+    // The same event can only trigger once in a logical instant
+    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> ((id(elem(i)) == id(elem(j)) && i != j)
+            ==> !tag_same(g(elem(i)), g(elem(j)))));
+    
+    // NULL events should appear in the suffix
+    axiom(forall (j : integer) :: in_range(j) ==> (
+        (id(elem(j)) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
+        ((i < j) ==> id(elem(i)) != NULL)
+    )));
+    
+    // All tags should be positive
+    axiom(forall (i : integer) :: in_range(i) ==> (
+        pi1(g(elem(i))) >= 0
+    ));
+    
+    // Begin the frame at the start time specified.
+    axiom(forall (i : integer) :: tag_same(g(elem(i)), {start, 0})
+        || tag_later(g(elem(i)), {start, 0}));
+     
+    /*******************************
+     * Application-specific axioms *
+     *******************************/
+    axiom(is_triggered_by_unconnected_port(c1_1));
+    axiom(is_triggered_by_physical_action(c1_2));
+    axiom(is_definitely_triggered_by_2(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
+    axiom(is_definitely_triggered_by(im1_1, c1_2, logical_delay(c1_2, im1_1)));
+    axiom(is_definitely_triggered_by(im1_2, c1_1, logical_delay(c1_1, im1_2)));
+    axiom(is_definitely_triggered_by(im1_3, im2_2, logical_delay(im2_2, im1_3)));
+    axiom(is_definitely_triggered_by_2(im1_4, im2_1, c1_2, logical_delay(im2_1, im1_4), logical_delay(c1_2, im1_4)));
+    
+    axiom(is_triggered_by_unconnected_port(c2_1));
+    axiom(is_triggered_by_physical_action(c2_2));
+    axiom(is_definitely_triggered_by_2(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
+    axiom(is_definitely_triggered_by(im2_1, c2_2, logical_delay(c2_2, im2_1)));
+    axiom(is_definitely_triggered_by(im2_2, c2_1, logical_delay(c2_1, im2_2)));
+    axiom(is_definitely_triggered_by(im2_3, im1_2, logical_delay(im1_2, im2_3)));
+    axiom(is_definitely_triggered_by_2(im2_4, im1_1, c2_2, logical_delay(im1_1, im2_4), logical_delay(c2_2, im2_4)));
+
+    /*********
+     * Debug *
+     *********/
+    /* Debug macro */
+    define exists_in_trace(e : id_t) : boolean
+    = exists (i : integer) :: in_range(i) && id(elem(i)) == e;
+    define at_least_two_in_trace(e : id_t) : boolean
+    = exists (i, j : integer) :: in_range(i) && in_range(j)
+        && id(elem(i)) == e 
+        && id(elem(j)) == e
+        && i != j;
+    define at_most_one_in_trace(e : id_t) : boolean
+    = !at_least_two_in_trace(e);
+
+    /* Debug cases */
+    // axiom(exists_in_trace(rsu_2));
+    // property test : false;
+
+    /**************
+     * Properties *
+     **************/
+
+    axiom(exists_in_trace(c1_1));
+    property test : false;
+    //////////////////////////////////////////////////
+     
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex;
+    }
+}
