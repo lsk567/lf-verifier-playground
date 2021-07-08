@@ -422,6 +422,51 @@ module main {
             && g(elem(i)) == tag_schedule(g(elem(j)), delay))
     );
     
+    // This macro ensures that the upstream MUST output.
+    define is_definitely_triggered_by_logical_connection(downstream, upstream : id_t,
+        delay : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_delay(g(elem(j)), delay))
+    ) && 
+    (forall (j : integer) :: in_range(j) ==>
+        id(elem(j)) == upstream ==> (exists (i : integer) :: in_range(i)
+            && id(elem(i)) == downstream 
+            && g(elem(i)) == tag_delay(g(elem(j)), delay))
+    );
+
+    // This macro ensures that the upstream MUST output.
+    define is_definitely_triggered_by_logical_action(downstream, upstream : id_t,
+        delay : interval_t) : boolean
+    = (forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    ) && 
+    (forall (j : integer) :: in_range(j) ==>
+        id(elem(j)) == upstream ==> (exists (i : integer) :: in_range(i)
+            && id(elem(i)) == downstream 
+            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+    );
+
+    // This macro ensures that the upstream MUST output.
+    define is_definitely_triggered_by_physical_connection(downstream, upstream : id_t) : boolean
+    = exists (delay : integer) :: delay > 0 
+    && ((forall (i : integer) :: in_range(i) ==>
+        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
+            && id(elem(j)) == upstream 
+            && g(elem(i)) == tag_delay(g(elem(j)), {delay, 0}))
+    ) && 
+    (forall (j : integer) :: in_range(j) ==>
+        id(elem(j)) == upstream ==> (exists (i : integer) :: in_range(i)
+            && id(elem(i)) == downstream 
+            && g(elem(i)) == tag_delay(g(elem(j)), {delay, 0}))
+    ));
+
+    define is_definitely_triggered_by_physical_action(downstream, upstream : id_t) : boolean
+    = is_definitely_triggered_by_physical_connection(downstream, upstream);
+
     // A reaction is triggered by 2 inputs.
     define is_triggered_by_2(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
     = (forall (i : integer) :: in_range(i) ==>
@@ -435,42 +480,28 @@ module main {
     ));
 
     // One of the two reactions must output.
-    define is_definitely_triggered_by_2(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
+    define is_definitely_triggered_by_2_logical_connections(down, up1, up2 : id_t, delay, delay2 : interval_t) : boolean
     = (forall (i : integer) :: in_range(i) ==>
         id(elem(i)) == down ==> (
             (exists (j : integer) :: in_range(j)
             && id(elem(j)) == up1 
-            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
+            && g(elem(i)) == tag_delay(g(elem(j)), delay))
             || (exists (j : integer) :: in_range(j)
             && id(elem(j)) == up2 
-            && g(elem(i)) == tag_schedule(g(elem(j)), delay2))
+            && g(elem(i)) == tag_delay(g(elem(j)), delay2))
     )) &&
     (forall (j : integer) :: in_range(j) ==>
         (
             (id(elem(j)) == up1 ==> (exists (i : integer) :: in_range(i)
                 && id(elem(i)) == down
-                && g(elem(i)) == tag_schedule(g(elem(j)), delay)))
+                && g(elem(i)) == tag_delay(g(elem(j)), delay)))
             &&
             (id(elem(j)) == up2 ==> (exists (i : integer) :: in_range(i)
                 && id(elem(i)) == down
-                && g(elem(i)) == tag_schedule(g(elem(j)), delay2)))
+                && g(elem(i)) == tag_delay(g(elem(j)), delay2)))
         )
     );
 
-    // This macro ensures that the upstream MUST output.
-    define is_definitely_triggered_by(downstream, upstream : id_t,
-        delay : interval_t) : boolean
-    = (forall (i : integer) :: in_range(i) ==>
-        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
-            && id(elem(j)) == upstream 
-            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
-    ) && 
-    (forall (j : integer) :: in_range(j) ==>
-        id(elem(j)) == upstream ==> (exists (i : integer) :: in_range(i)
-            && id(elem(i)) == downstream 
-            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
-    );
-    
     define is_in_trace(_id : id_t) : boolean
     = (exists (i : integer) :: in_range(i) && id(elem(i)) == _id);
 
@@ -508,18 +539,41 @@ module main {
     axiom(forall (i : integer) :: tag_same(g(elem(i)), {start, 0})
         || tag_later(g(elem(i)), {start, 0}));
      
+    /****************************
+     * Connectivity graph order *
+     ****************************/
+    define precedes(e1, e2 : id_t) : boolean
+    = forall (i, j : integer) :: in_range(i) && in_range(j)
+        ==> id(elem(i)) == e1 && id(elem(j)) == e2 
+            && tag_same(g(elem(i)), g(elem(j))) 
+            ==> i < j;
+
+    // Specify connections in the connectivity graph.
+    // In fact, just connections, no need for action.
+    // Since actions are within the same reactor and
+    // the order is taken care of by the priorities.
+    // With reactions across different reactors, there
+    // are no priority values that can be used. Therefore
+    // we resort to connectivity graph.
+    axiom(precedes(v1_1, rsu_1));
+    axiom(precedes(v1_3, rsu_3));
+    axiom(precedes(v2_1, rsu_1));
+    axiom(precedes(v2_3, rsu_3));
+    axiom(precedes(rsu_2, v1_2));
+    axiom(precedes(rsu_2, v2_2));
+
     /*******************************
      * Application-specific axioms *
      *******************************/
     axiom(is_triggered_by_physical_action(v1_1));
-    axiom(is_definitely_triggered_by(v1_2, rsu_2, logical_delay(rsu_2, v1_2)));
-    axiom(is_definitely_triggered_by(v1_3, v1_2, logical_delay(v1_2, v1_3)));
+    axiom(is_definitely_triggered_by_logical_connection(v1_2, rsu_2, logical_delay(rsu_2, v1_2)));
+    axiom(is_definitely_triggered_by_logical_action(v1_3, v1_2, logical_delay(v1_2, v1_3)));
     axiom(is_triggered_by_physical_action(v2_1));
-    axiom(is_definitely_triggered_by(v2_2, rsu_2, logical_delay(rsu_2, v2_2)));
-    axiom(is_definitely_triggered_by(v2_3, v2_2, logical_delay(v2_2, v2_3)));
-    axiom(is_definitely_triggered_by_2(rsu_1, v1_1, v2_1, logical_delay(v1_1, rsu_1), logical_delay(v2_1, rsu_1)));
-    axiom(is_definitely_triggered_by(rsu_2, rsu_1, logical_delay(rsu_1, rsu_2)));
-    axiom(is_definitely_triggered_by_2(rsu_3, v1_3, v2_3, logical_delay(v1_3, rsu_3), logical_delay(v2_3, rsu_3)));
+    axiom(is_definitely_triggered_by_logical_connection(v2_2, rsu_2, logical_delay(rsu_2, v2_2)));
+    axiom(is_definitely_triggered_by_physical_action(v2_3, v2_2));
+    axiom(is_definitely_triggered_by_2_logical_connections(rsu_1, v1_1, v2_1, logical_delay(v1_1, rsu_1), logical_delay(v2_1, rsu_1)));
+    axiom(is_definitely_triggered_by_logical_action(rsu_2, rsu_1, logical_delay(rsu_1, rsu_2)));
+    axiom(is_definitely_triggered_by_2_logical_connections(rsu_3, v1_3, v2_3, logical_delay(v1_3, rsu_3), logical_delay(v2_3, rsu_3)));
     
     /*********
      * Debug *
@@ -542,21 +596,21 @@ module main {
     /**************
      * Properties *
      **************/
-    /****************************************
-     * (a.arrive) /\ X(F(b.arrives))        *
-     *  ==> F((a.grant) /\ X(F(b.grant)))   *
-     *
-     * (_tuple_0 v1_1 (_tuple_1 11 10011))  *
-     * (_tuple_0 v2_1 (_tuple_1 11 10011))  *
-     * (_tuple_0 rsu_1 (_tuple_1 11 10012)) *
-     * (_tuple_0 rsu_2 (_tuple_1 11 10013)) *
-     * (_tuple_0 v2_2 (_tuple_1 11 10014))  *
-     * (_tuple_0 v2_3 (_tuple_1 11 10015))  *
-     * (_tuple_0 v1_2 (_tuple_1 11 10014))  *
-     * (_tuple_0 v1_3 (_tuple_1 11 10015))  *
-     * (_tuple_0 rsu_3 (_tuple_1 11 10016)) *
-     * (_tuple_0 NULL (_tuple_1 11 10009))  *
-     ****************************************/
+    /*****************************************
+     * (a.arrive) /\ X(F(b.arrives))         *
+     *  ==> F((a.grant) /\ X(F(b.grant)))    *
+     *                                       *
+     * (_tuple_0 v1_1 (_tuple_1 2609 2606))  *
+     * (_tuple_0 v2_1 (_tuple_1 2609 2606))  *
+     * (_tuple_0 rsu_1 (_tuple_1 2609 2606)) *
+     * (_tuple_0 rsu_2 (_tuple_1 2609 2607)) *
+     * (_tuple_0 v2_2 (_tuple_1 2609 2607))  *
+     * (_tuple_0 v1_2 (_tuple_1 2609 2607))  *
+     * (_tuple_0 v1_3 (_tuple_1 2609 2608))  *
+     * (_tuple_0 rsu_3 (_tuple_1 2609 2608)) *
+     * (_tuple_0 v2_3 (_tuple_1 7470 2607))  *
+     * (_tuple_0 rsu_3 (_tuple_1 7470 2607)) *
+     *****************************************/
     /*
     // Check if the current event is a.arrive.
     define phi1(modality : integer) : boolean
@@ -617,8 +671,8 @@ module main {
     */
      
     /****************************************
-     * (a.arrive) /\ X(F(b.arrives))        *
-     *  ==> F((a.done) /\ X(F(b.grant)))    *
+     * (a.arrive) /\ X(F(b.arrives)) /\ F(a.grant)       *
+     *  ==> (!b.grant /\ X(!b.grant)) U a.done    *
      *                                      *
      * (_tuple_0 v1_1 (_tuple_1 11 10011))  *
      * (_tuple_0 v2_1 (_tuple_1 11 10011))  *
@@ -638,7 +692,56 @@ module main {
     // Check if the current event is b.arrive.
     define phi2(modality : integer) : boolean
     = id(elem(modality)) == v2_1; // b.arrive
+
+    define phi3(modality : integer) : boolean
+    = id(elem(modality)) == v1_2; // a.grant
     
+    define phi4(modality : integer) : boolean
+    = id(elem(modality)) == v2_2; // b.grant
+
+    define phi5(modality : integer) : boolean
+    = id(elem(modality)) == v1_3; // a.done
+
+    // F(b.arrives) = F(phi2)
+    define phi6(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi2(i);
+
+    // X(F(b.arrives)) = X(phi6)
+    define phi7(modality : integer) : boolean
+    = phi6(modality + 1);
+
+    // F(a.grant) = F(phi3)
+    define phi8(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi3(i);
+
+    // X(!b.grant)
+    define phi9(modality : integer) : boolean
+    = !phi4(modality + 1);
+
+    // (!b.grant /\ X(!b.grant))
+    define phi10(modality : integer) : boolean
+    = !phi4(modality) && phi9(modality);
+
+    // Strong Until
+    define phi11(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality && phi5(i)
+        && (forall (j : integer) :: (modality <= j && j < i)
+            ==> phi10(j));
+    
+    // Weak Until
+    define phi12(modality : integer) : boolean
+    = // G(p) \/ U(p, q)
+        // G(p)
+        (forall (i : integer) :: (in_range(i) && i >= modality) ==> phi10(i))
+        // \/ U(p, q)
+        || phi11(modality);
+
+    property mutual_exclusion : phi1(0) && phi7(0) && phi8(0) ==> phi12(0);
+
+    /*
+
     // phi3 := F(phi2)
     define phi3(modality : integer) : boolean
     = exists (i : integer) :: in_range(i) && i >= modality
@@ -683,6 +786,7 @@ module main {
     = phi5(modality) ==> phi11(modality);
     
     property mutual_exclusion : phi12(0);
+    */
     //////////////////////////////////////////////////
      
     control {
