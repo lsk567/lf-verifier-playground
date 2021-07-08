@@ -331,7 +331,7 @@ module main {
     
     // Strong Until
     define U(modality_idx : integer) : boolean
-    = exists (i : integer) :: in_range(i) && q(elem(i))
+    = exists (i : integer) :: in_range(i) && i >= modality_idx && q(elem(i))
         && (forall (j : integer) :: (modality_idx <= j && j < i)
             ==> p(elem(j)));
     
