@@ -94,11 +94,12 @@ module main {
     /*****************
      * Trace Element *
      ****************/
-    type event_t = { id_t, tag_t };
+    type event_t = { id_t, integer, tag_t };
     
     // Projection macros
-    define id(e : event_t) : id_t     = e._1;
-    define g(e : event_t) : tag_t     = e._2;
+    define id(e : event_t) : id_t = e._1;
+    define v(e : event_t) : integer = e._2;
+    define g(e : event_t) : tag_t = e._3;
     
     define isNULL(e : event_t) : boolean = id(e) == NULL;
      
@@ -136,7 +137,7 @@ module main {
                                 if (i == 7) then tr._8 else (
                                     if (i == 8) then tr._9 else (
                                         if (i == 9) then tr._10 else (
-                                            { NULL, inf() }
+                                            { NULL, -1, inf() }
                                         )
                                     )
                                 )
@@ -560,7 +561,7 @@ module main {
         // both in_range's are needed due to !(exists), which turns into a forall.
         && !(exists (b, a : integer) :: in_range(a) && in_range(b)
             && id(elem(b)) != _id
-            && _id_same_fed(elem(b), {_id, zero()})
+            && _id_same_fed(elem(b), {_id, -1, zero()})
             && id(elem(a)) == _id
             && (_is_latest_invocation_in_same_fed_wrt_(a, b)
                 && tag_later(g(elem(b)), tag_schedule(g(elem(a)), timer_period(_id))) ));
@@ -759,8 +760,8 @@ module main {
     axiom(is_triggered_by_physical_action(c1_2));
 
     // c1_3
-    // axiom(is_definitely_triggered_by_2_logical_connections(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
-    axiom(is_definitely_triggered_by_2_logical_actions(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
+    axiom(is_definitely_triggered_by_2_logical_connections(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
+    // axiom(is_definitely_triggered_by_2_logical_actions(c1_3, im1_3, im1_4, logical_delay(im1_3, c1_3), logical_delay(im1_4, c1_3)));
 
     // im1_1
     axiom(is_definitely_triggered_by_logical_connection(im1_1, c1_2, logical_delay(c1_2, im1_1)));
@@ -784,8 +785,8 @@ module main {
     axiom(is_triggered_by_physical_action(c2_2));
 
     // c2_3
-    // axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
-    axiom(is_definitely_triggered_by_2_logical_actions(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
+    axiom(is_definitely_triggered_by_2_logical_connections(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
+    // axiom(is_definitely_triggered_by_2_logical_actions(c2_3, im2_3, im2_4, logical_delay(im2_3, c2_3), logical_delay(im2_4, c2_3)));
 
     // im2_1
     axiom(is_definitely_triggered_by_logical_connection(im2_1, c2_2, logical_delay(c2_2, im2_1)));
@@ -827,7 +828,18 @@ module main {
      * (a.arrive) /\ X(F(b.arrives))         *
      *  ==> F((a.grant) /\ X(F(b.grant)))    *
      *                                       *
+          (_tuple_0 c1_2 (_tuple_1 6 1))
+          (_tuple_0 c2_2 (_tuple_1 6 1))
+          (_tuple_0 im1_1 (_tuple_1 6 1))
+          (_tuple_0 im2_1 (_tuple_1 6 1))
+          (_tuple_0 im2_4 (_tuple_1 6 1))
+          (_tuple_0 c2_3 (_tuple_1 6 2))
+          (_tuple_0 im1_4 (_tuple_1 6 1))
+          (_tuple_0 c1_3 (_tuple_1 6 2))
+          (_tuple_0 NULL (_tuple_1 13 4))
+          (_tuple_0 NULL (_tuple_1 11 6))
      *****************************************/
+    /*
     // Check if the current event is a.arrive.
     define phi1(modality : integer) : boolean
     = id(elem(modality)) == c1_2; // a.arrive
@@ -859,8 +871,8 @@ module main {
     
     // phi8 := F(phi7)
     define phi8(modality : integer) : boolean
-    = exists (i : integer) :: in_range(i) && i >= modality
-        && phi7(i);
+    = exists (k : integer) :: in_range(k) && k >= modality
+        && phi7(k);
 
     // phi9 := X(phi8)
     define phi9(modality : integer) : boolean
@@ -887,16 +899,12 @@ module main {
     define phi12(modality : integer) : boolean
     = phi5(modality) ==> phi11(modality);
     
-    // phi12 := phi5 ==> phi11
-    define phi13(modality : integer) : boolean
-    = phi5(modality) ==> false;
-
     // axiom(phi12(0));
     // axiom(exists_in_trace(v1_1));
     // axiom(exists_in_trace(v1_2));
     // property test : false;
     
-    // property fairness : phi12(0);
+    property fairness : phi12(0);
 
     // Why no model?
     // axiom(phi11(0));
@@ -904,7 +912,7 @@ module main {
     // axiom(phi8(0)); // ok
     // axiom(phi9(0)); // ok 
     
-    /* UCLID BUG! */
+    ////// UCLID BUG!
     // When there is a redundant variable i being used in quantified formulas,
     // the solver automatically returns unsat.
     // Solution: avoid conflict!
@@ -912,7 +920,7 @@ module main {
     // axiom(exists (i : integer) :: in_range(i) && i >= 0 && phi9(i)); // Does not work!!
     
     // axiom(exists (j : integer) :: in_range(j) && j >= 0 && phi9(j)); // works!!
-    property test : false;
+    // property test : false;
 
     // axiom(exists_in_trace(c1_3));
     // axiom(exists_in_trace(im2_1));
@@ -920,6 +928,80 @@ module main {
     // axiom(exists_in_trace(c1_2));
     // axiom(exists_in_trace(c2_2));
     // property test : false;
+    */
+
+
+
+
+    /****************************************
+     * (a.arrive) /\ X(F(b.arrives)) /\ F(a.grant)       *
+     *  ==> (!b.grant /\ X(!b.grant)) U a.done    *
+     *                                      *
+     * (_tuple_0 v1_1 (_tuple_1 11 10011))  *
+     * (_tuple_0 v2_1 (_tuple_1 11 10011))  *
+     * (_tuple_0 rsu_1 (_tuple_1 11 10012)) *
+     * (_tuple_0 rsu_2 (_tuple_1 11 10013)) *
+     * (_tuple_0 v2_2 (_tuple_1 11 10014))  *
+     * (_tuple_0 v2_3 (_tuple_1 11 10015))  *
+     * (_tuple_0 v1_2 (_tuple_1 11 10014))  *
+     * (_tuple_0 v1_3 (_tuple_1 11 10015))  *
+     * (_tuple_0 rsu_3 (_tuple_1 11 10016)) *
+     * (_tuple_0 NULL (_tuple_1 11 10009))  *
+     ****************************************/
+    // Check if the current event is a.arrive.
+    define phi1(modality : integer) : boolean
+    = id(elem(modality)) == v1_1; // a.arrive
+
+    // Check if the current event is b.arrive.
+    define phi2(modality : integer) : boolean
+    = id(elem(modality)) == v2_1; // b.arrive
+
+    define phi3(modality : integer) : boolean
+    = id(elem(modality)) == v1_2; // a.grant
+    
+    define phi4(modality : integer) : boolean
+    = id(elem(modality)) == v2_2; // b.grant
+
+    define phi5(modality : integer) : boolean
+    = id(elem(modality)) == v1_3; // a.done
+
+    // F(b.arrives) = F(phi2)
+    define phi6(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi2(i);
+
+    // X(F(b.arrives)) = X(phi6)
+    define phi7(modality : integer) : boolean
+    = phi6(modality + 1);
+
+    // F(a.grant) = F(phi3)
+    define phi8(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi3(i);
+
+    // X(!b.grant)
+    define phi9(modality : integer) : boolean
+    = !phi4(modality + 1);
+
+    // (!b.grant /\ X(!b.grant))
+    define phi10(modality : integer) : boolean
+    = !phi4(modality) && phi9(modality);
+
+    // Strong Until
+    define phi11(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality && phi5(i)
+        && (forall (j : integer) :: (modality <= j && j < i)
+            ==> phi10(j));
+    
+    // Weak Until
+    define phi12(modality : integer) : boolean
+    = // G(p) \/ U(p, q)
+        // G(p)
+        (forall (i : integer) :: (in_range(i) && i >= modality) ==> phi10(i))
+        // \/ U(p, q)
+        || phi11(modality);
+
+    property mutual_exclusion : phi1(0) && phi7(0) && phi8(0) ==> phi12(0);
     //////////////////////////////////////////////////
      
     control {
