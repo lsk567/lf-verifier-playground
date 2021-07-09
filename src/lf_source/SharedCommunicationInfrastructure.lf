@@ -1,0 +1,86 @@
+target C;
+
+reactor A {
+    output data:int;
+    output write:bool;
+    
+    physical action compute;
+    
+    reaction(compute) -> data, write {=
+        
+    =}
+}
+
+reactor B {
+    output data:int;
+    output write:bool;
+    
+    physical action compute;
+    
+    reaction(compute) -> data, write {=
+        
+    =}
+}
+
+reactor C {
+    output data:int;
+    output write:bool;
+    
+    physical action compute;
+    
+    reaction(compute) -> data, write {=
+        
+    =}
+}
+
+reactor Controller {
+    input[3] write:bool;
+    output[3] control:bool;
+    
+    reaction(write) -> control {=
+        
+    =}
+}
+
+reactor Bus {
+    input[3] control:bool;
+    input[3] data:int;
+    output[3] out:int;
+    
+    reaction(control, data) -> out {=
+        
+    =}
+}
+
+reactor D {
+    input data_A:int;
+    input data_B:int;
+    
+    reaction(data_A, data_B) {=
+        
+    =}
+}
+
+reactor E {
+    input data_C:int;
+    
+    reaction(data_C) {=
+        
+    =}
+}
+
+main reactor {
+    a = new A();
+    b = new B();
+    c = new C();
+    d = new D();
+    e = new E();
+    
+    controller = new Controller();
+    bus = new Bus();
+    
+    controller.control -> bus.control;
+    a.write, b.write, c.write -> controller.write;
+    a.data, b.data, c.data -> bus.data;
+    bus.out -> d.data_A, d.data_B, e.data_C;
+}
