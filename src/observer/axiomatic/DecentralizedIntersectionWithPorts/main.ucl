@@ -896,7 +896,6 @@ module main {
           (_tuple_0 NULL (_tuple_1 13 4))
           (_tuple_0 NULL (_tuple_1 11 6))
      *****************************************/
-    /*
     // Check if the current event is a.arrive.
     define phi1(modality : integer) : boolean
     = id(elem(modality)) == c1_2; // a.arrive
@@ -927,9 +926,14 @@ module main {
     = id(elem(modality)) == c2_3; // b.grant
     
     // phi8 := F(phi7)
+    /*
     define phi8(modality : integer) : boolean
     = exists (k : integer) :: in_range(k) && k >= modality
         && phi7(k);
+    */
+    define phi8(modality : integer) : boolean
+    = exists (i : integer) :: in_range(i) && i >= modality
+        && phi7(i);
 
     // phi9 := X(phi8)
     define phi9(modality : integer) : boolean
@@ -969,24 +973,21 @@ module main {
     // axiom(phi8(0)); // ok
     // axiom(phi9(0)); // ok 
     
-    ////// UCLID BUG!
+    ////// UCLID BUG
     // When there is a redundant variable i being used in quantified formulas,
     // the solver automatically returns unsat.
     // Solution: avoid conflict!
-    //
-    // axiom(exists (i : integer) :: in_range(i) && i >= 0 && phi9(i)); // Does not work!!
-    
-    // axiom(exists (j : integer) :: in_range(j) && j >= 0 && phi9(j)); // works!!
-    // property test : false;
+    axiom(exists (i : integer) :: in_range(i) && i >= 0 && phi9(i)); // Does not work
+    // axiom(exists (j : integer) :: in_range(j) && j >= 0 && phi9(j)); // works
+    property test : false;
 
     // axiom(exists_in_trace(c1_3));
     // axiom(exists_in_trace(im2_1));
     // axiom(id(elem(0)) == im2_1);
     // axiom(exists_in_trace(c1_2));
     // axiom(exists_in_trace(c2_2));
-    axiom(exists_in_trace(p1_remote));
-    property test : false;
-    */
+    // axiom(exists_in_trace(p1_remote));
+    // property test : false;
 
 
     /*****************************************
@@ -1087,6 +1088,7 @@ module main {
     /*****************************************
      * G!(p1_local /\ F())
      */
+    /*
     // Check if the current event is p1_local.
     define phi1(modality : integer) : boolean
     = id(elem(modality)) == p1_local && v(elem(modality)) == 1; // p1_local
@@ -1116,6 +1118,7 @@ module main {
         ==> !(phi1(i3) && phi5(i3));
 
     property consistency : phi6(0);
+    */
 
     //////////////////////////////////////////////////
      
