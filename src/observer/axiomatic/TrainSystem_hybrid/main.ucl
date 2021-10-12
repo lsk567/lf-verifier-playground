@@ -105,8 +105,15 @@ module main {
     var doorState : element_t;
     var ctrl1State : element_t;
     var ctrl2State : element_t;
+
+    /*********
+     * Flags *
+     *********/
     var trainMoves : boolean;
     var doorCloses : boolean;
+    // type flag_t = enum { TRUE, FALSE, UNKNOWN };
+    // var trainMoves : flag_t;
+    // var doorCloses : flag_t;
     
     /************
      * Topology *
@@ -124,18 +131,25 @@ module main {
         (i1 == controller_1 && i2 == controller_2) ||
         (i1 == controller_2 && i2 == controller_1);
 
-    // Triggers
-
-
     //////////////////////////////////////////////////
+    // All timestamps and microsteps are nonnegative.
+    axiom(pi1(g(state)) >= 0 && pi2(g(state)) >= 0);
+
+    // Each state can either be NULL or has an ID specific to the rxn.
     axiom(id(ctrl1State) == NULL || id(ctrl1State) == controller_1);
     axiom(id(ctrl2State) == NULL || id(ctrl2State) == controller_2);
     axiom(id(trainState) == NULL || id(trainState) == train_1);
     axiom(id(doorState) == NULL || id(doorState) == door_1);
 
+    // NULL state <==> UNKNWON flag
+    // axiom(id(trainState) == NULL <==> trainMoves == UNKNOWN);
+    // axiom(id(doorState) == NULL <==> doorCloses == UNKNOWN);
+
     init {
         doorCloses = false;
         trainMoves = false;
+        // doorCloses = UNKNOWN;
+        // trainMoves = UNKNOWN;
         doorState = {NULL, {0,0}};
         trainState = {NULL, {0,0}};
         ctrl1State = {NULL, {0,0}};
@@ -143,16 +157,17 @@ module main {
     }
 
     next {
-        havoc state; 
-
         // Update status
+        havoc state; 
         case
             (id(state) == door_1) : {
                 doorCloses' = true;
+                // doorCloses' = TRUE;
                 doorState' = state;
             }
             (id(state) == train_1) : {
                 trainMoves' = true;
+                // trainMoves' = TRUE;
                 trainState' = state;
             }
             (id(state) == controller_1) : {
@@ -166,11 +181,23 @@ module main {
         /*********************
          * Reactor Semantics *
          *********************/
+        // This model works but not useful, because
+        // when logical delay between controller and
+        // train is set to 1, the CEX shows train at
+        // (1,0) before door at (0,0). Essentially,
+        // messages are not processing in time-stamp
+        // order.
+        //
+        // Solution: do not initialize doorCloses and
+        // trainMoves to false. Set them to UNKNOWN
+        // instead and tie them to the NULL state. 
+        // Then the monotonic assumption
+        // will mandate that the door be handled before
+        // the delayed train reaction, in order to
+        // produce the counterexample.
+
         // Tags progress monotonically.
         assume(tag_same(g(state'), g(state)) || tag_later(g(state'), g(state)));
-
-        // All timestamps and microsteps are nonnegative.
-        assume(pi1(g(state)) >= 0 && pi2(g(state)) >= 0);
 
         // The same event can only trigger once in a logical instant.
         assume(g(state) == g(state') ==> id(state) != id(state'));
@@ -184,6 +211,7 @@ module main {
             ==> tag_diff(g(ctrl2State'), g(ctrl1State)) == zero());
         assume((id(ctrl2State) != NULL && id(trainState') != NULL)
             ==> tag_diff(g(trainState'), g(ctrl2State)) == zero());
+            // ==> tag_diff(g(trainState'), g(ctrl2State)) == {1,0}); // FIXME: this should resolve the CEX, but it doesn't.
         assume((id(ctrl2State) != NULL && id(doorState') != NULL)
             ==> tag_diff(g(doorState'), g(ctrl2State)) == zero());
 
@@ -195,9 +223,10 @@ module main {
 
     //////////////////////////////////////////////////
     property prop: trainMoves ==> doorCloses;
+    // property prop: trainMoves == TRUE ==> doorCloses == TRUE;
 
     control {
-        v = induction;
+        v = induction(1);
         check;
         print_results;
         v.print_cex;
