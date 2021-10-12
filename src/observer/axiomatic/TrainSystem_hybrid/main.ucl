@@ -67,13 +67,10 @@ module main {
     = if (!isInf(t) && !isInf(i))
         then { pi1(t) + pi1(i), pi2(t) + pi2(i) }
         else inf();
+
+    define tag_diff(t1, t2 : tag_t) : tag_t
+    = {pi1(t1) - pi1(t2), pi2(t1) - pi2(t2)};
     
-    // Only consider timestamp for now.
-    define tag_diff(t1, t2: tag_t) : interval_t
-    = if (!isInf(t1) && !isInf(t2))
-        then { pi1(t1) - pi1(t2), pi2(t1) - pi2(t2) }
-        else inf();
-     
     /**********************************
      * Reactions & connectivity graph *
      *********************************/
@@ -106,7 +103,8 @@ module main {
 
     var trainState : element_t;
     var doorState : element_t;
-    var ctrlState : element_t;
+    var ctrl1State : element_t;
+    var ctrl2State : element_t;
     var trainMoves : boolean;
     var doorCloses : boolean;
     
@@ -121,29 +119,27 @@ module main {
                 if (i == train_1) then 1 else (
                     999))));
      
-    // Triggers
-
-    // Return logical delay in a connection.
-    define connection_delay(i1, i2 : id_t) : interval_t
-    = if (i1 == controller_2 && i2 == door_1) then zero() else (
-        if (i1 == controller_2 && i2 == train_1) then zero() else inf()); 
-
     define same_reactor(i1, i2 : id_t) : boolean
     = i1 == i2 ||
         (i1 == controller_1 && i2 == controller_2) ||
         (i1 == controller_2 && i2 == controller_1);
 
-    /***************************
-     * Topological Abstraction *
-     ***************************/
+    // Triggers
 
-     
+
     //////////////////////////////////////////////////
+    axiom(id(ctrl1State) == NULL || id(ctrl1State) == controller_1);
+    axiom(id(ctrl2State) == NULL || id(ctrl2State) == controller_2);
+    axiom(id(trainState) == NULL || id(trainState) == train_1);
+    axiom(id(doorState) == NULL || id(doorState) == door_1);
+
     init {
         doorCloses = false;
         trainMoves = false;
         doorState = {NULL, {0,0}};
         trainState = {NULL, {0,0}};
+        ctrl1State = {NULL, {0,0}};
+        ctrl2State = {NULL, {0,0}};
     }
 
     next {
@@ -159,8 +155,11 @@ module main {
                 trainMoves' = true;
                 trainState' = state;
             }
+            (id(state) == controller_1) : {
+                ctrl1State' = state;
+            }
             (id(state) == controller_2) : {
-                ctrlState' = state;
+                ctrl2State' = state;
             }
         esac
         
@@ -168,11 +167,10 @@ module main {
          * Reactor Semantics *
          *********************/
         // Tags progress monotonically.
-        // assume(tag_later(g(state'), g(state)));
-        assume(tag_same(g(state'), g(state)));
+        assume(tag_same(g(state'), g(state)) || tag_later(g(state'), g(state)));
 
-        // All microsteps are positive.
-        assume(pi2(g(state)) >= 0);
+        // All timestamps and microsteps are nonnegative.
+        assume(pi1(g(state)) >= 0 && pi2(g(state)) >= 0);
 
         // The same event can only trigger once in a logical instant.
         assume(g(state) == g(state') ==> id(state) != id(state'));
@@ -182,15 +180,24 @@ module main {
             ==> priority(id(state)) < priority(id(state')));
 
         // Connection delay
-        // assume((id(ctrlState) != NULL && id(trainState) != NULL)
-        //     ==> pi1());
+        assume((id(ctrl1State) != NULL && id(ctrl2State') != NULL)
+            ==> tag_diff(g(ctrl2State'), g(ctrl1State)) == zero());
+        assume((id(ctrl2State) != NULL && id(trainState') != NULL)
+            ==> tag_diff(g(trainState'), g(ctrl2State)) == zero());
+        assume((id(ctrl2State) != NULL && id(doorState') != NULL)
+            ==> tag_diff(g(doorState'), g(ctrl2State)) == zero());
+
+        // Trigger mechanism
+        assume(id(ctrl1State) == NULL ==> id(ctrl2State') == NULL);
+        assume(id(ctrl2State) == NULL ==> id(trainState') == NULL);
+        assume(id(ctrl2State) == NULL ==> id(doorState') == NULL);
     }
 
     //////////////////////////////////////////////////
     property prop: trainMoves ==> doorCloses;
 
     control {
-        v = unroll(3);
+        v = induction;
         check;
         print_results;
         v.print_cex;
