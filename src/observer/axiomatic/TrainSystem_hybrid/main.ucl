@@ -222,7 +222,8 @@ module main {
     }
 
     //////////////////////////////////////////////////
-    property prop: trainMoves ==> doorCloses;
+    // property prop: trainMoves ==> doorCloses;
+    property prop2: !(trainMoves && !doorCloses);
     // property prop: trainMoves == TRUE ==> doorCloses == TRUE;
 
     control {
