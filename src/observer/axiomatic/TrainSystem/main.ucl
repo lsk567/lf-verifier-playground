@@ -59,6 +59,8 @@ module main {
     // by comparing the tags and the priorities of the two events.
     //
     // TODO: account for nested reactors in federates.
+    // FIXME: priority only makes sense within a reactor. It does
+    // not transfer across reactors.
     define _hb_same_fed(_e1, _e2 : element_t) : boolean
     = tag_earlier(g(_e1), g(_e2)) ||
         (tag_same(g(_e1), g(_e2)) && priority(id(_e1)) < priority(id(_e2)));

@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e # Terminate on error
 
-echo '*** Setting up smt directory'
+echo '*** Setting up smt/ directory'
 rm -rf ./smt/ && mkdir -p smt
 
-echo '*** Generating SMT files from UCLID5'
+echo '*** Generating SMT files with UCLID5'
 uclid -g "smt/output" main.ucl
 
 echo '*** Append (get-model) to each file'
