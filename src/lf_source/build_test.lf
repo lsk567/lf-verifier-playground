@@ -1,0 +1,10 @@
+target C {
+    build: [
+        "ls",
+        "pwd"
+    ]
+}
+
+main reactor {
+    
+}

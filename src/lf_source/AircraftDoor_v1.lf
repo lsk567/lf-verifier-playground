@@ -79,7 +79,7 @@ reactor Door {
     =}
 }
 
-main reactor AircraftDoor {
+main reactor {
     
     controller	= new Controller();
     vision		= new Vision();

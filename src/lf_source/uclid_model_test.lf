@@ -1,0 +1,31 @@
+target C {
+    uclid-model: true
+}
+
+reactor A {
+    output out:int;
+    physical action a(2 sec);
+    
+    reaction(startup) -> a {=
+        
+    =}
+    
+    reaction(a) -> out {=
+        
+    =}
+}
+
+reactor B {
+    input _in:int;
+    
+    reaction(_in) {=
+        
+    =}
+}
+
+main reactor {
+    a = new A();
+    b = new B();
+    
+    a.out ~> b._in; 
+}
