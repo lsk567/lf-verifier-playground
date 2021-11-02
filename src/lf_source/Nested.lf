@@ -1,0 +1,12 @@
+target C;
+
+reactor Child {
+    input _in:int;
+}
+
+reactor Parent {
+    input _in:int;
+    
+    child = new Child();
+    _in -> child._in;
+}
