@@ -19,7 +19,7 @@ module main {
     invariant x_ge_0: x >= 0;
 
     control {
-        v = induction(1);
+        v = induction(2);
         check;
         print_results;
         v.print_cex;
