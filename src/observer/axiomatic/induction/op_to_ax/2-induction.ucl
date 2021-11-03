@@ -1,0 +1,61 @@
+module main {
+
+    /* Trace definition */
+    const START : integer = 0;
+    const END : integer = 2;
+    type step_t = integer;
+    type trace_t = { event_t, event_t, event_t };
+    type event_t = {
+        boolean,    // b
+        integer     // x
+    };
+    var trace : trace_t; 
+
+    /* Helper functions */ 
+    define get(tr : trace_t, i : step_t) : event_t 
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else {true, 0}));
+    define elem(i : step_t) : event_t
+    = get(trace, i);
+    define b(i : step_t) : boolean
+    = elem(i)._1;
+    define x(i : step_t) : integer
+    = elem(i)._2;
+
+
+    /* Transition system */
+    // b' = !b
+    axiom(forall (i : step_t) :: (i >= START && i < END)
+        ==> b(i) == !b(i + 1));
+
+    // if (b) {
+    //     x' = x + 3;
+    // } else {
+    //     x' = x - 2;
+    // }
+    axiom(forall (i : step_t) :: (i >= START && i < END)
+        ==> (
+            (b(i) ==> (x(i + 1) == x(i) + 3))
+            && (!b(i) ==> (x(i + 1) == x(i) - 2))
+        ));
+
+
+    /* Property */
+    define x_ge_0(i : step_t) : boolean = x(i) < 0;
+
+    // init {
+    //     b = true;
+    //     x = 0;
+    // }
+    property initialization: (x(0) == 0 && b(0) == true) ==> (x_ge_0(0) && x_ge_0(1));
+    property consecution: (x_ge_0(0) && x_ge_0(1)) ==> x_ge_0(2);
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex();
+    }
+
+}
