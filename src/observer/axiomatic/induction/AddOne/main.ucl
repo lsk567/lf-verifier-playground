@@ -1,22 +1,22 @@
 module main {
- 
-    /*******************************
-     * Time and Related Operations *
-     ******************************/
-    type timestamp_t = integer; // Unit is nanoseconds
+
+    /********
+     * Time *
+     ********/
+    type timestamp_t = integer; // unit is nanoseconds
     type microstep_t = integer;
     type tag_t = {
         timestamp_t,
         microstep_t
     };
-    // FIXME: in LF, the interval is an integer.
+    // fixme: in lf, the interval is an integer.
     type interval_t  = tag_t;
     
-    // Projection macros
-    define pi1(t : tag_t)   : timestamp_t   = t._1;         // Get timestamp from tag
-    define pi2(t : tag_t)   : microstep_t   = t._2;         // Get microstep from tag
+    // projection macros
+    define pi1(t : tag_t)   : timestamp_t   = t._1;         // get timestamp from tag
+    define pi2(t : tag_t)   : microstep_t   = t._2;         // get microstep from tag
     
-    // Interval constructor
+    // interval constructor
     define zero() : interval_t
     = {0, 0};
     define startup() : interval_t
@@ -34,11 +34,11 @@ module main {
     define inf() : interval_t
     = {-1, 0};
     
-    // Helper function
+    // helper function
     define isInf(i : interval_t) : boolean
     = pi1(i) < 0;
     
-    // Tag comparison
+    // tag comparison
     define tag_later(t1 : tag_t, t2 : tag_t) : boolean
     = pi1(t1) > pi1(t2)
         || (pi1(t1) == pi1(t2) && pi2(t1) > pi2(t2))
@@ -52,7 +52,7 @@ module main {
         || (pi1(t1) == pi1(t2) && pi2(t1) < pi2(t2))
         || (!isInf(t1) && isInf(t2));
     
-    // Tag algebra
+    // tag algebra
     define tag_schedule(t : tag_t, i : interval_t) : tag_t
     = if (!isInf(t) && pi1(i) == 0 && !isInf(i))
         then { pi1(t), pi2(t) + 1 } // microstep delay
@@ -65,268 +65,189 @@ module main {
         then { pi1(t) + pi1(i), pi2(t) + pi2(i) }
         else inf();
     
-    // Only consider timestamp for now.
+    // only consider timestamp for now.
     define tag_diff(t1, t2: tag_t) : interval_t
     = if (!isInf(t1) && !isInf(t2))
         then { pi1(t1) - pi1(t2), pi2(t1) - pi2(t2) }
         else inf();
      
     /**********************************
-     * Reactions & connectivity graph *
+     * Reactions & Connectivity Graph *
      *********************************/
-    
-    //////////////////////////
-    // Application Specific
-    // Element IDs
-    type id_t = enum {  
+    // Reaction ids
+    type rxn_t = enum {  
         NULL,    // NULL 
-        AddOne_1 // Reactions
+        AddOne_1 // reactions
     };
 
     type state_t = {
         integer, // _in
         integer  // out
     };
-    //////////////////////////
      
-    /*****************
-     * Trace Element *
-     ****************/
-    type event_t = { id_t, tag_t, state_t };
-    
-    // Projection macros
-    define id(e : event_t) : id_t     = e._1;
-    define g(e : event_t) : tag_t     = e._2;
-    define s(e : event_t) : state_t   = e._3;
-
-    // Application specific: state variables
-    define _in(s : state_t) : integer = s._1;
-    define out(s : state_t) : integer = s._2;
-    
-    define isNULL(e : event_t) : boolean = id(e) == NULL;
      
     /********************
-     * Trace Definition *
+     * trace definition *
      *******************/
     const START : integer = 0;
-    const END : integer = 9;
+    const END : integer = 2;
     
     define in_range(num : integer) : boolean
     = num >= START && num <= END;
     
     type step_t = integer;
+    type event_t = { rxn_t, tag_t, state_t };
     type trace_t = { 
-        event_t,
-        event_t,
-        event_t,
-        event_t,
-        event_t,
-        event_t,
-        event_t,
         event_t,
         event_t,
         event_t
     };
     
+    // mark the start of the trace.
+    var start : timestamp_t;
+    assume(start == 0);
+     
+    // declare the trace
+    var trace : trace_t;
+
+    /*****************
+     * helper macros *
+     ****************/
+    // helper macro that returns an element based on index
     define get(tr : trace_t, i : step_t) : event_t 
     = if (i == 0) then tr._1 else (
         if (i == 1) then tr._2 else (
             if (i == 2) then tr._3 else (
-                if (i == 3) then tr._4 else (
-                    if (i == 4) then tr._5 else (
-                        if (i == 5) then tr._6 else (
-                            if (i == 6) then tr._7 else (
-                                if (i == 7) then tr._8 else (
-                                    if (i == 8) then tr._9 else (
-                                        if (i == 9) then tr._10 else (
-                                            { NULL, inf(), { 0, 0 } }
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
+                { NULL, inf(), { 0, 0 } }
             )
         )
     );
-
-    // Mark the start of the trace.
-    var start : timestamp_t;
-    assume(start == pi1(zero()));
-     
-    // Declare the trace
-    // The counterexample reflects a particular frame of reference.
-    var trace : trace_t;
-    
-    // Helper macro that returns an element based on index
-    define elem(i : integer) : event_t
+    define elem(i : step_t) : event_t
     = get(trace, i);
      
+    // projection macros
+    define rxn(i : step_t) : rxn_t      = elem(i)._1;
+    define  g(i : step_t) : tag_t     = elem(i)._2;
+    define  s(i : step_t) : state_t   = elem(i)._3;
+
+    // application specific: state variables
+    define    _in(s : state_t) : integer = s._1;
+    define    out(s : state_t) : integer = s._2;
+    define isNULL(i : step_t) : boolean = rxn(i) == NULL;
+
     /************
      * Topology *
      ************/
-    // Return reaction priority.
-    define priority(i : id_t) : integer
-    = if (i == AddOne_1) then 1 else 999; 
+    // nothing for this program
      
-    // Return logical delay in a connection.
-    define connection_delay(i1, i2 : id_t) : interval_t
-    = inf(); 
-
-    // Timer-related constants and macros.
-    const NUM_TIMERS : integer = 0;
-
-    define timer_period(i : id_t) : interval_t
-    = inf();
-
-    define timer_offset(i : id_t) : interval_t
-    = inf();
-
     /***************************
      * Topological Abstraction *
      ***************************/
-
-    define is_multiple_of(a, b : integer) : boolean
-    = exists (c : integer) :: b * c == a;
-    
-    define is_closest_starting_point(t : tag_t, period : integer, offset : integer) : boolean
-    = (exists (c : integer) :: (period * c) + offset == pi1(t)
-        // Tick at the next valid instant.
-        && (period * (c - 1) + offset) < start)     
-        // Timer always has mstep of 0.
-        && pi2(t) == 0;                           
-    
-    // first & last in trace
-    define first(e : event_t) : boolean
-    = !(exists (i : integer) :: in_range(i) && id(elem(i)) == id(e) && tag_earlier(g(elem(i)), g(e))); 
-    
-    define last(e : event_t) : boolean
-    = !(exists (i : integer) :: in_range(i) && id(elem(i)) == id(e) && tag_later(g(elem(i)), g(e))); 
-    
-    define is_triggered_by_startup(_id : id_t) : boolean
-    = // If startup is within frame, put the events in the trace.
+    /*
+    define is_triggered_by_startup(_id : rxn_t) : boolean
+    = // if startup is within frame, put the events in the trace.
     ((start == 0) ==> (exists (i : integer) :: in_range(i)
-        && id(elem(i)) == _id && tag_same(g(elem(i)), startup())))
-    // Can only appear once.
-    && !(exists (j : integer) :: in_range(j) && id(elem(j)) == _id
-        && !tag_same(g(elem(j)), startup()));
-    
-    // Can directly use index as HB since this only applies to events
-    // on the same federate.
-    define _is_latest_invocation_in_same_fed_wrt_(a, b : integer) : boolean
-    = !(exists (c : integer) :: in_range(c) 
-        && id(elem(c)) == id(elem(a)) && a < c && c < b);
-    
-
-    // This includes the possibility that upstream does NOT output.
-    define is_triggered_by(downstream, upstream : id_t, delay : interval_t) : boolean
-    = (forall (i : integer) :: in_range(i) ==>
-        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
-            && id(elem(j)) == upstream 
-            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
-    );
-    
-    // This macro ensures that the upstream MUST output.
-    define is_definitely_triggered_by(downstream, upstream : id_t,
-        delay : interval_t) : boolean
-    = (forall (i : integer) :: in_range(i) ==>
-        id(elem(i)) == downstream ==> (exists (j : integer) :: in_range(j)
-            && id(elem(j)) == upstream 
-            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
-    ) && 
-    (forall (j : integer) :: in_range(j) ==>
-        id(elem(j)) == upstream ==> (exists (i : integer) :: in_range(i)
-            && id(elem(i)) == downstream 
-            && g(elem(i)) == tag_schedule(g(elem(j)), delay))
-    );
-    
-    define is_in_trace(_id : id_t) : boolean
-    = (exists (i : integer) :: in_range(i) && id(elem(i)) == _id);
+        && rxn(i) == _id && tag_same(g(i), startup())))
+    // can only appear once.
+    && !(exists (j : integer) :: in_range(j) && rxn(j) == _id
+        && !tag_same(g(j), startup()));
+    */
 
     /*********************
      * Reactor Semantics *
      *********************/
+    /** transition relation **/
+    // transition relation constrains future states
+    // based on previous states.
 
-    // [Federated] The trace should respect the HB relation.
-    // In this case, there is no constraint on i, j when hb
-    // fails to establish on both direction (def. of concurrent).
-    // axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
-    //     ==> (_hb(elem(i), elem(j)) ==> i < j));
-
-    // [Non-federated] Events are processed in timestamped order.
+    // [non-federated] events are processed in timestamped order.
     axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
-        ==> (tag_earlier(g(elem(i)), g(elem(j))) ==> i < j));
+        ==> (tag_earlier(g(i), g(j)) ==> i < j));
     
-    // All microsteps are positive
-    axiom(forall (i : integer) :: in_range(i)
-        ==> pi2(g(elem(i))) >= 0);
-    
-    // The same event can only trigger once in a logical instant
-    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
-        ==> ((id(elem(i)) == id(elem(j)) && i != j)
-            ==> !tag_same(g(elem(i)), g(elem(j)))));
-    
-    // NULL events should appear in the suffix
-    axiom(forall (j : integer) :: in_range(j) ==> (
-        (id(elem(j)) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
-        ((i < j) ==> id(elem(i)) != NULL)
-    )));
-    
-    // All tags should be positive
-    axiom(forall (i : integer) :: in_range(i) ==> (
-        pi1(g(elem(i))) >= 0
-    ));
-    
-    // Begin the frame at the start time specified.
-    axiom(forall (i : integer) :: tag_same(g(elem(i)), {start, 0})
-        || tag_later(g(elem(i)), {start, 0}));
-     
-    /*****************
-     * Reaction Body *
-     *****************/
+    /* reaction body */
     // pre: true
     // post: out == _in + 1
     axiom(forall (i : integer) :: in_range(i) ==> 
-        (id(elem(i)) == AddOne_1 ==> 
-            out(s(elem(i))) == _in(s(elem(i))) + 1));
+        (rxn(i) == AddOne_1 ==> 
+            out(s(i)) == _in(s(i)) + 1));
+    
+    // the same event can only trigger once in a logical instant
+    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> ((rxn(i) == rxn(j) && i != j)
+            ==> !tag_same(g(i), g(j))));
+    
+    // NULL events should appear in the suffix
+    axiom(forall (j : integer) :: in_range(j) ==> (
+        (rxn(j) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
+        ((i < j) ==> rxn(i) != NULL)
+    )));
 
-    /*******************************
-     * Application-specific axioms *
-     *******************************/
-    // axiom(is_triggered_by_startup(AddOne_1));
+    // All tags should be positive
+    // Note: the 1st state is not constrainted, since
+    //       this is formulated as a transition relation
+    //       which does not constrain the initial state.
+    axiom(forall (i : integer) :: (i > START && i <= END)
+        ==> pi1(g(i)) >= 0);
+
+    // All microsteps are positive
+    axiom(forall (i : integer) :: (i > START && i <= END)
+        ==> pi2(g(i)) >= 0);
+
+    /** helper invariant **/
+    // helper invariant constrains the current state at all times.
      
-    /**********************
-     * Proof by induction *
-     **********************/
-    /* Debug case 1 */
-    // axiom(exists (i : integer) :: id(elem(i)) == controller_2);
-    // property test : false;
+    // begin the frame at the start time specified.
+    define frame_start(i : integer) : boolean
+    = tag_same(g(i), {start, 0})
+        || tag_later(g(i), {start, 0});
 
-    /* Invariant: out should always be (_in + 1). */
+    define helper_invariant(i : integer) : boolean
+    = frame_start(i);
 
-    // Inductive
+
+    /****************
+     * Connectivity *
+     ****************/
+    // axiom(is_triggered_by_startup(AddOne_1));
+
+    /**************
+     * Properties *
+     **************/
+    // inductive
     // define prop(i : integer) : boolean
-    //     = (id(elem(i)) == AddOne_1 ==> out(s(elem(i))) == _in(s(elem(i))) + 1);
+    //     = (rxn(i) == AddOne_1 ==> out(s(i)) == _in(s(i)) + 1);
 
-    // Inductive
+    // inductive
     define prop(i : integer) : boolean
-        = (id(elem(i)) == AddOne_1 ==> out(s(elem(i))) != _in(s(elem(i))));
+        = (rxn(i) == AddOne_1 ==> out(s(i)) != _in(s(i)));
 
-    // Not inductive
+    // not inductive
     // define prop(i : integer) : boolean
-    //     = (id(elem(i)) == AddOne_1 ==> out(s(elem(i))) < 10);
+    //     = (rxn(i) == AddOne_1 ==> out(s(i)) < 10);
 
-    // This is bounded model checking with non-deterministic starting point.
-    // property inv : forall (i : integer) :: in_range(i) ==> prop(i);
 
-    // k-induction
-    // Initialization
-    property initialization : prop(START);
+    /*********************
+     * Initial Condition *
+     *********************/
+    define initial_condition() : boolean
+    = g(0) == {0, 0}
+        && out(s(0)) == 0
+        && _in(s(0)) == 0;
 
-    // Consecution
-    property consecution : (forall (i : integer) :: (i >= START && i < END) ==> prop(i))
-        ==> prop(END);
+    /***************
+     * K-induction *
+     ***************/
+    // initialization
+    property initialization : forall (i : integer) ::
+        (i >= START && i <= END && initial_condition())
+            ==> (prop(i) && helper_invariant(i));
+
+    // fixme: the state is not completely unconstrained.
+    //        the invariant is not inductive.
+    // consecution
+    property consecution : (forall (i : integer) ::
+        (i >= START && i < END) ==> prop(i))
+            ==> prop(END);
      
     //////////////////////////////////////////////////
      
