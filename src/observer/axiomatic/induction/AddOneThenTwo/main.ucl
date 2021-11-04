@@ -159,19 +159,22 @@ module main {
             )));
 
     // FIXME: Would be nice if UCLID supports recursion of macros.
-    // Counterfactual causality. 
     // Happened-before relation defined for a local reactor.
     // Used to preserve trace ordering.
     define hb(e1, e2 : event_t) : boolean
-    = ((e1._1 == source_1 && e2._1 == component_1)
-        || (e1._1 == component_1 && e2._1 == component_2)
-        || (e1._1 == component_2 && e2._1 == sink_1))
-    && pi1(e2._2) - pi1(e1._2) == pi1(delay(e1._1, e2._1));
+    = tag_earlier(e1._2, e2._2)
+        || (tag_same(e1._2, e2._2)
+            && ((e1._1 == source_1 && e2._1 == component_1)
+            || (e1._1 == component_1 && e2._1 == component_2)
+            || (e1._1 == component_2 && e2._1 == sink_1)));
 
     define startup_triggers(n : rxn_t) : boolean
     = // if startup is within frame, put the events in the trace.
         ((start == 0) ==> (exists (i : integer) :: in_range(i)
-            && rxn(i) == n && tag_same(g(i), zero())));
+            && rxn(i) == n && tag_same(g(i), zero())))
+        // Can ONLY be triggered at (0,0).
+        && !(exists (j : integer) :: in_range(j) && rxn(j) == n
+            && !tag_same(g(j), zero()));
 
     // Note: The current formulation of "triggers" precludes
     //       partial reaction triggering chain.
@@ -284,12 +287,6 @@ module main {
             && (rxn(i) != component_2 ==> sink__in(s(i)) == sink__in(s(i - 1)))
         ));
 
-    /** helper invariant **/
-    // helper invariant constrains the current state at all times.
-     
-    define helper_invariant(i : integer) : boolean
-    = true; // Trivial for now
-
     /****************
      * Connectivity *
      ****************/
@@ -300,20 +297,6 @@ module main {
         delay(component_1, component_2)));
     axiom(triggers_via_logical_connection(component_2, sink_1,
         delay(component_2, sink_1)));
-
-
-    /**************
-     * Properties *
-     **************/
-    define prop(i : step_t) : boolean
-    // = (rxn(i) == sink_1) ==> (sink__in(s(i)) != 3); // Expect a witness.
-    = (rxn(i) == sink_1) ==> (sink__in(s(i)) == 3); // Expect a witness.
-    // = rxn(i) != source_1;
-    // = (source_out(s(i)) != 1); 
-    // = (rxn(i) == component_2 ==> false);
-    // = (rxn(i) == source_1 ==> false);
-    // = false;
-    // = rxn(i) != NULL;
 
 
     /*********************
@@ -333,6 +316,27 @@ module main {
     // = true;
 
 
+    /**************
+     * Properties *
+     **************/
+    define prop(i : step_t) : boolean
+    = (rxn(i) == sink_1) ==> (sink__in(s(i)) != 3); // Expect a witness.
+    // = (rxn(i) == sink_1) ==> (sink__in(s(i)) == 3); // Expect a witness.
+    // = rxn(i) != source_1;
+    // = (source_out(s(i)) != 1); 
+    // = (rxn(i) == component_2 ==> false);
+    // = (rxn(i) == source_1 ==> false);
+    // = false;
+    // = rxn(i) != NULL;
+
+    /** helper invariant **/
+    // helper invariant constrains the current state at all times.
+     
+    define helper_invariant(i : integer) : boolean
+    = g(0) == zero() ==> initial_condition();
+    // = true; // Trivial
+
+
     /***************
      * K-induction *
      ***************/
@@ -350,8 +354,8 @@ module main {
     // Note: state 0 needs to be unconstrained.
     // consecution
     property consecution : (forall (i : integer) ::
-        (i >= START && i < END) ==> prop(i))
-            ==> prop(END);
+        (i >= START && i < END) ==> (prop(i) && helper_invariant(i)))
+            ==> (prop(END) && helper_invariant(END));
      
     //////////////////////////////////////////////////
      
