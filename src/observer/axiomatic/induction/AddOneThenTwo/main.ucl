@@ -94,7 +94,7 @@ module main {
      * trace definition *
      *******************/
     const START : integer = 0;
-    const END   : integer = 3;
+    const END   : integer = 4;
     
     define in_range(num : integer) : boolean
     = num >= START && num <= END;
@@ -102,6 +102,7 @@ module main {
     type step_t  = integer;
     type event_t = { rxn_t, tag_t, state_t };
     type trace_t = { 
+        event_t,
         event_t,
         event_t,
         event_t,
@@ -123,7 +124,9 @@ module main {
         if (i == 1) then tr._2 else (
             if (i == 2) then tr._3 else (
                 if (i == 3) then tr._4 else (
-                    { NULL, inf(), { 0, 0, 0, 0, 0 } }
+                    if (i == 4) then tr._5 else (
+                        { NULL, inf(), { 0, 0, 0, 0, 0 } }
+                    )
                 )
             )
         )
@@ -140,31 +143,54 @@ module main {
     // application specific: state variables
     define    source_out(s : state_t) : integer = s._1;
     define component__in(s : state_t) : integer = s._2;
-    define component_out(s : state_t) : integer = s._3;
-    define  component__s(s : state_t) : integer = s._4;
+    define  component__s(s : state_t) : integer = s._3;
+    define component_out(s : state_t) : integer = s._4;
     define      sink__in(s : state_t) : integer = s._5;
 
 
     /***************************
      * Topological Abstraction *
      ***************************/
+    define delay(r1, r2 : rxn_t) : interval_t
+    = if (r1 == source_1 && r2 == component_1) then zero() else (
+        if (r1 == component_1 && r2 == component_2) then sec(1) else (
+            if (r1 == component_2 && r2 == sink_1) then zero() else (
+                inf()
+            )));
+
+    // FIXME: Would be nice if UCLID supports recursion of macros.
+    // Counterfactual causality. 
+    // Happened-before relation defined for a local reactor.
+    // Used to preserve trace ordering.
+    define hb(e1, e2 : event_t) : boolean
+    = ((e1._1 == source_1 && e2._1 == component_1)
+        || (e1._1 == component_1 && e2._1 == component_2)
+        || (e1._1 == component_2 && e2._1 == sink_1))
+    && pi1(e2._2) - pi1(e1._2) == pi1(delay(e1._1, e2._1));
+
     define startup_triggers(n : rxn_t) : boolean
     = // if startup is within frame, put the events in the trace.
         ((start == 0) ==> (exists (i : integer) :: in_range(i)
-            && rxn(i) == n && tag_same(g(i), zero())))
-        // can only appear once.
-        && !(exists (j : integer) :: in_range(j) && rxn(j) == n
-            && !tag_same(g(j), zero()));
+            && rxn(i) == n && tag_same(g(i), zero())));
 
     // Note: The current formulation of "triggers" precludes
     //       partial reaction triggering chain.
     // This includes the possibility that upstream does NOT output.
-    define triggers(upstream, downstream : rxn_t, delay : interval_t) : boolean
+    define triggers_via_logical_action
+        (upstream, downstream : rxn_t, delay : interval_t) : boolean
     = forall (i : integer) :: in_range(i)
         ==> (rxn(i) == downstream 
             ==> (exists (j : integer) :: in_range(j)
                 && rxn(j) == upstream 
                 && g(i) == tag_schedule(g(j), delay)));
+
+    define triggers_via_logical_connection
+        (upstream, downstream : rxn_t, delay : interval_t) : boolean
+    = forall (i : integer) :: in_range(i)
+        ==> (rxn(i) == downstream 
+            ==> (exists (j : integer) :: in_range(j)
+                && rxn(j) == upstream 
+                && g(i) == tag_delay(g(j), delay)));
 
     /*********************
      * Reactor Semantics *
@@ -175,18 +201,21 @@ module main {
 
     // [non-federated] events are processed in timestamped order.
     axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
-        ==> (tag_earlier(g(i), g(j)) ==> i < j));
+        ==> (hb(elem(i), elem(j)) ==> i < j));
     
     // the same event can only trigger once in a logical instant
     axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
         ==> ((rxn(i) == rxn(j) && i != j)
             ==> !tag_same(g(i), g(j))));
     
+    /*
+    // FIXME: Do not uncomment this, if you want to the 1st state to be NULL!
     // NULL events should appear in the suffix
     axiom(forall (j : integer) :: in_range(j) ==> (
         (rxn(j) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
         ((i < j) ==> rxn(i) != NULL)
     )));
+    */
 
     // All tags should be positive
     // Note: the 1st state is not constrainted, since
@@ -204,91 +233,119 @@ module main {
      * Reactions *
      *************/
     // pre: true
-    // post: sink.out == 1
+    // post: source.out == 1
     axiom(forall (i : integer) :: (i > START && i <= END) ==> 
-        (rxn(i) == source_1 ==> 
-            source_out(s(i)) == 1));
+        ((rxn(i) == source_1 ==> 
+            source_out(s(i)) == 1)
+        // Default value: output 0, though it should be absent.
+        && (rxn(i) != source_1 ==> 
+            source_out(s(i)) == -1)));
     
     // pre: true
     // post: component._s == component._in
     axiom(forall (i : integer) :: (i > START && i <= END) ==> 
         (rxn(i) == component_1 ==> 
-            component__s(s(i)) == component__in(s(i))));
+            component__s(s(i)) == component__in(s(i)))
+        // Default value: same as last state
+        && (rxn(i) != component_1 ==> 
+            component__s(s(i)) == component__s(s(i - 1))));
 
     // pre: true
     // post: component.out == component._s + 2
     axiom(forall (i : integer) :: (i > START && i <= END) ==> 
         (rxn(i) == component_2 ==> 
-            component_out(s(i)) == component__s(s(i)) + 2));
+            component_out(s(i)) == component__s(s(i)) + 2)
+        // Default value: 0, though it should be absent.
+        && (rxn(i) != component_2 ==> 
+            component_out(s(i)) == -1));
 
     // pre: true
     // post: true 
     axiom(forall (i : integer) :: (i > START && i <= END) ==> 
         (rxn(i) == component_2 ==> true));
 
-    /***************
-     * Connections *
-     ***************/
+    /******************************************
+     * Shared Variable Induced by Connections *
+     ******************************************/
+    // Constrains input port values
+
+    // FIXME: Put them in auxiliary invariant?
     // source.out -> component._in 
-    axiom(forall (i : integer) :: (i > START && i <= END)
-        ==> source_out(s(i)) == component__in(s(i)));
+    axiom(forall (i : integer) :: (i >= START && i <= END)
+        ==> (
+            (rxn(i) == source_1 ==> component__in(s(i)) == source_out(s(i)))
+            && (rxn(i) != source_1 ==> component__in(s(i)) == component__in(s(i - 1)))
+        ));
 
     // component.out -> sink._in 
-    axiom(forall (i : integer) :: (i > START && i <= END)
-        ==> component_out(s(i)) == sink__in(s(i)));
-
+    axiom(forall (i : integer) :: (i >= START && i <= END)
+        ==> (
+            (rxn(i) == component_2 ==> sink__in(s(i)) == component_out(s(i)))
+            && (rxn(i) != component_2 ==> sink__in(s(i)) == sink__in(s(i - 1)))
+        ));
 
     /** helper invariant **/
     // helper invariant constrains the current state at all times.
      
-    // begin the frame at the start time specified.
-    define frame_start(i : integer) : boolean
-    = tag_same(g(i), {start, 0})
-        || tag_later(g(i), {start, 0});
-
     define helper_invariant(i : integer) : boolean
-    = frame_start(i);
-
+    = true; // Trivial for now
 
     /****************
      * Connectivity *
      ****************/
     axiom(startup_triggers(source_1));
-    axiom(triggers(source_1, component_1, zero()));
-    axiom(triggers(component_1, component_2, sec(1)));
-    axiom(triggers(component_2, sink_1, zero()));
+    axiom(triggers_via_logical_connection(source_1, component_1,
+        delay(source_1, component_1)));
+    axiom(triggers_via_logical_action(component_1, component_2,
+        delay(component_1, component_2)));
+    axiom(triggers_via_logical_connection(component_2, sink_1,
+        delay(component_2, sink_1)));
 
 
     /**************
      * Properties *
      **************/
     define prop(i : step_t) : boolean
-    = (rxn(i) == sink_1 ==> source_out(s(i)) != 10); // FIXME: Spurious CEX!
+    // = (rxn(i) == sink_1) ==> (sink__in(s(i)) != 3); // Expect a witness.
+    = (rxn(i) == sink_1) ==> (sink__in(s(i)) == 3); // Expect a witness.
+    // = rxn(i) != source_1;
+    // = (source_out(s(i)) != 1); 
     // = (rxn(i) == component_2 ==> false);
     // = (rxn(i) == source_1 ==> false);
     // = false;
+    // = rxn(i) != NULL;
 
 
     /*********************
      * Initial Condition *
      *********************/
+    // FIXME: Initial condition makes it pass trivially.
     define initial_condition() : boolean
     = start == 0
+        && rxn(0) == NULL
         && g(0) == {0, 0}
         && source_out(s(0)) == 0
         && component__in(s(0)) == 0
         && component_out(s(0)) == 0
         && component__s(s(0)) == 0
-        && sink__in(s(0)) == 0;
+        && sink__in(s(0)) == 0
+        ;
+    // = true;
 
 
     /***************
      * K-induction *
      ***************/
     // initialization
-    property initialization : forall (i : integer) ::
-        (i >= START && i <= END && initial_condition())
-            ==> (prop(i) && helper_invariant(i));
+    // initialization
+    // property initialization : initial_condition() ==> prop(1);
+    property initialization : initial_condition() ==>
+        (forall (i : integer) ::
+            (i >= START && i <= END)
+                ==> (
+                    prop(i)
+                    && helper_invariant(i)
+                ));
 
     // Note: state 0 needs to be unconstrained.
     // consecution
