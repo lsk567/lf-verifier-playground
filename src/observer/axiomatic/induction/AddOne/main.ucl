@@ -242,8 +242,7 @@ module main {
         (i >= START && i <= END && initial_condition())
             ==> (prop(i) && helper_invariant(i));
 
-    // fixme: the state is not completely unconstrained.
-    //        the invariant is not inductive.
+    // Note: state 0 needs to be unconstrained.
     // consecution
     property consecution : (forall (i : integer) ::
         (i >= START && i < END) ==> prop(i))
