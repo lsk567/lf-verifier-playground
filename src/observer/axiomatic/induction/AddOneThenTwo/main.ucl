@@ -161,6 +161,7 @@ module main {
                 inf()
             )));
 
+    // Non-federated "happened-before"
     // FIXME: Would be nice if UCLID supports recursion of macros.
     // Happened-before relation defined for a local reactor.
     // Used to preserve trace ordering.
@@ -207,7 +208,7 @@ module main {
     // transition relation constrains future states
     // based on previous states.
 
-    // [non-federated] events are processed in timestamped order.
+    // Events are ordered by "happened-before" relation.
     axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
         ==> (hb(elem(i), elem(j)) ==> i < j));
     
@@ -216,14 +217,11 @@ module main {
         ==> ((rxn(i) == rxn(j) && i != j)
             ==> !tag_same(g(i), g(j))));
 
-    // All tags should be positive
-    // Note: the 1st state is not constrainted, since
-    //       this is formulated as a transition relation
-    //       which does not constrain the initial state.
+    // Tags should be positive
     axiom(forall (i : integer) :: (i > START && i <= END)
         ==> pi1(g(i)) >= 0);
 
-    // All microsteps are positive
+    // Microsteps should be positive
     axiom(forall (i : integer) :: (i > START && i <= END)
         ==> pi2(g(i)) >= 0);
 
