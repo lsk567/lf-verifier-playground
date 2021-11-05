@@ -9,7 +9,6 @@ module main {
         timestamp_t,
         microstep_t
     };
-    // fixme: in lf, the interval is an integer.
     type interval_t  = tag_t;
     
     // projection macros
@@ -69,10 +68,12 @@ module main {
         then { pi1(t1) - pi1(t2), pi2(t1) - pi2(t2) }
         else inf();
      
+
+
     /**********************************
      * Reactions & Connectivity Graph *
      *********************************/
-    // Reaction ids
+    // Reactions
     type rxn_t = enum {  
         NULL,
         source_1,
@@ -90,6 +91,7 @@ module main {
     };
      
     
+
     /********************
      * trace definition *
      *******************/
@@ -148,6 +150,7 @@ module main {
     define      sink__in(s : state_t) : integer = s._5;
 
 
+
     /***************************
      * Topological Abstraction *
      ***************************/
@@ -195,6 +198,8 @@ module main {
                 && rxn(j) == upstream 
                 && g(i) == tag_delay(g(j), delay)));
 
+
+
     /*********************
      * Reactor Semantics *
      *********************/
@@ -210,15 +215,6 @@ module main {
     axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
         ==> ((rxn(i) == rxn(j) && i != j)
             ==> !tag_same(g(i), g(j))));
-    
-    /*
-    // FIXME: Do not uncomment this, if you want to the 1st state to be NULL!
-    // NULL events should appear in the suffix
-    axiom(forall (j : integer) :: in_range(j) ==> (
-        (rxn(j) != NULL) ==> (forall (i : integer) :: in_range(i) ==> 
-        ((i < j) ==> rxn(i) != NULL)
-    )));
-    */
 
     // All tags should be positive
     // Note: the 1st state is not constrainted, since
@@ -230,6 +226,7 @@ module main {
     // All microsteps are positive
     axiom(forall (i : integer) :: (i > START && i <= END)
         ==> pi2(g(i)) >= 0);
+
 
 
     /*************
@@ -267,6 +264,8 @@ module main {
     axiom(forall (i : integer) :: (i > START && i <= END) ==> 
         (rxn(i) == component_2 ==> true));
 
+
+
     /******************************************
      * Shared Variable Induced by Connections *
      ******************************************/
@@ -287,6 +286,8 @@ module main {
             && (rxn(i) != component_2 ==> sink__in(s(i)) == sink__in(s(i - 1)))
         ));
 
+
+
     /****************
      * Connectivity *
      ****************/
@@ -297,6 +298,7 @@ module main {
         delay(component_1, component_2)));
     axiom(triggers_via_logical_connection(component_2, sink_1,
         delay(component_2, sink_1)));
+
 
 
     /*********************
@@ -316,46 +318,46 @@ module main {
     // = true;
 
 
+
     /**************
      * Properties *
      **************/
-    define prop(i : step_t) : boolean
-    = (rxn(i) == sink_1) ==> (sink__in(s(i)) != 3); // Expect a witness.
-    // = (rxn(i) == sink_1) ==> (sink__in(s(i)) == 3); // Expect a witness.
-    // = rxn(i) != source_1;
-    // = (source_out(s(i)) != 1); 
-    // = (rxn(i) == component_2 ==> false);
-    // = (rxn(i) == source_1 ==> false);
-    // = false;
-    // = rxn(i) != NULL;
+    define inv(i : step_t) : boolean
 
-    /** helper invariant **/
-    // helper invariant constrains the current state at all times.
-     
-    define helper_invariant(i : integer) : boolean
-    = g(0) == zero() ==> initial_condition();
+    /** The final output is three. **/
+    = (rxn(i) == sink_1) ==> (sink__in(s(i)) == 3); 
+    
+    /** component.out > component.s **/
+    // = (rxn(i) == component_2) ==> (component_out(s(i)) > component__s(s(i))); 
+    
+    /** After component_1 is triggered, s' > s. **/
+    // = (rxn(i) == component_1) ==> (component__s(s(i)) > component__s(s(i - 1)));
+
+
+    // Auxiliary invariant
+    define auxiliary_invariant(i : integer) : boolean
     // = true; // Trivial
+    = g(0) == zero() ==> initial_condition();
+
 
 
     /***************
      * K-induction *
      ***************/
     // initialization
-    // initialization
-    // property initialization : initial_condition() ==> prop(1);
     property initialization : initial_condition() ==>
         (forall (i : integer) ::
             (i >= START && i <= END)
                 ==> (
-                    prop(i)
-                    && helper_invariant(i)
+                    inv(i)
+                    && auxiliary_invariant(i)
                 ));
 
     // Note: state 0 needs to be unconstrained.
     // consecution
     property consecution : (forall (i : integer) ::
-        (i >= START && i < END) ==> (prop(i) && helper_invariant(i)))
-            ==> (prop(END) && helper_invariant(END));
+        (i >= START && i < END) ==> (inv(i) && auxiliary_invariant(i)))
+            ==> (inv(END) && auxiliary_invariant(END));
      
     //////////////////////////////////////////////////
      
