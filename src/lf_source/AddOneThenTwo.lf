@@ -1,0 +1,40 @@
+target C;
+
+reactor Source {
+    output out:int;
+    reaction(startup) -> out {=
+        SET(out, 1);
+    =}
+}
+
+reactor Component {
+    input  _in:int;
+    output out:int;
+    state _s:int(0);
+    logical action delay(1 sec);
+    
+    reaction(_in) -> delay {=
+        self->s = _in->value;
+        schedule(delay);
+    =}
+    
+    reaction(delay) -> out {=
+        SET(out, self->s + 2);
+    =}
+}
+
+reactor Sink {
+    input _in:int;
+    reaction(_in) {=
+        printf("%d\n", _in->value);
+    =}
+}
+
+main reactor {
+    source = new Source();
+    comp = new Component();
+    sink = new Sink();
+    
+    source.out -> comp._in;
+    comp.out -> sink._in;
+}
