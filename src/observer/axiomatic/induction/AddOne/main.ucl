@@ -71,6 +71,8 @@ module main {
         then { pi1(t1) - pi1(t2), pi2(t1) - pi2(t2) }
         else inf();
      
+
+
     /**********************************
      * Reactions & Connectivity Graph *
      *********************************/
@@ -85,9 +87,10 @@ module main {
         integer  // out
     };
      
+
      
     /********************
-     * trace definition *
+     * Trace Definition *
      *******************/
     const START : integer = 0;
     const END : integer = 2;
@@ -109,6 +112,8 @@ module main {
      
     // declare the trace
     var trace : trace_t;
+
+
 
     /*****************
      * helper macros *
@@ -135,23 +140,14 @@ module main {
     define    out(s : state_t) : integer = s._2;
     define isNULL(i : step_t) : boolean = rxn(i) == NULL;
 
+
+
     /************
      * Topology *
      ************/
     // nothing for this program
-     
-    /***************************
-     * Topological Abstraction *
-     ***************************/
-    /*
-    define is_triggered_by_startup(_id : rxn_t) : boolean
-    = // if startup is within frame, put the events in the trace.
-    ((start == 0) ==> (exists (i : integer) :: in_range(i)
-        && rxn(i) == _id && tag_same(g(i), startup())))
-    // can only appear once.
-    && !(exists (j : integer) :: in_range(j) && rxn(j) == _id
-        && !tag_same(g(j), startup()));
-    */
+
+
 
     /*********************
      * Reactor Semantics *
@@ -167,7 +163,7 @@ module main {
     /* reaction body */
     // pre: true
     // post: out == _in + 1
-    axiom(forall (i : integer) :: in_range(i) ==> 
+    axiom(forall (i : integer) :: (i > START && i <= END) ==> 
         (rxn(i) == AddOne_1 ==> 
             out(s(i)) == _in(s(i)) + 1));
     
@@ -201,14 +197,17 @@ module main {
     = tag_same(g(i), {start, 0})
         || tag_later(g(i), {start, 0});
 
-    define helper_invariant(i : integer) : boolean
+    define auxiliary_invariant(i : integer) : boolean
     = frame_start(i);
+
 
 
     /****************
      * Connectivity *
      ****************/
     // axiom(is_triggered_by_startup(AddOne_1));
+
+
 
     /**************
      * Properties *
@@ -217,8 +216,8 @@ module main {
     // define prop(i : integer) : boolean
     //     = (rxn(i) == AddOne_1 ==> out(s(i)) == _in(s(i)) + 1);
 
-    // inductive
-    define prop(i : integer) : boolean
+    // invariant
+    define inv(i : integer) : boolean
         = (rxn(i) == AddOne_1 ==> out(s(i)) != _in(s(i)));
 
     // not inductive
@@ -226,28 +225,38 @@ module main {
     //     = (rxn(i) == AddOne_1 ==> out(s(i)) < 10);
 
 
+
     /*********************
      * Initial Condition *
      *********************/
     define initial_condition() : boolean
-    = g(0) == {0, 0}
+    = start == 0
+        && rxn(0) == NULL
+        && g(0) == {0, 0}
         && out(s(0)) == 0
         && _in(s(0)) == 0;
+
+
 
     /***************
      * K-induction *
      ***************/
     // initialization
-    property initialization : forall (i : integer) ::
-        (i >= START && i <= END && initial_condition())
-            ==> (prop(i) && helper_invariant(i));
+    property initialization : initial_condition() ==>
+        (forall (i : integer) ::
+            (i >= START && i <= END)
+                ==> (
+                    inv(i)
+                    && auxiliary_invariant(i)
+                ));
 
     // Note: state 0 needs to be unconstrained.
     // consecution
     property consecution : (forall (i : integer) ::
-        (i >= START && i < END) ==> prop(i))
-            ==> prop(END);
-     
+        (i >= START && i < END) ==> (inv(i) && auxiliary_invariant(i)))
+            ==> (inv(END) && auxiliary_invariant(END));
+
+
     //////////////////////////////////////////////////
      
     control {
