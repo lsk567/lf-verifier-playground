@@ -42,7 +42,7 @@ module main {
 
 
     /* Property */
-    define x_ge_0(i : step_t) : boolean = x(i) < 0;
+    define x_ge_0(i : step_t) : boolean = x(i) >= 0;
 
     // init {
     //     b = true;

@@ -217,12 +217,12 @@ module main {
     //     = (rxn(i) == AddOne_1 ==> out(s(i)) == _in(s(i)) + 1);
 
     // invariant
-    define inv(i : integer) : boolean
-        = (rxn(i) == AddOne_1 ==> out(s(i)) != _in(s(i)));
+    // define inv(i : integer) : boolean
+    //     = (rxn(i) == AddOne_1 ==> out(s(i)) != _in(s(i)));
 
     // not inductive
-    // define prop(i : integer) : boolean
-    //     = (rxn(i) == AddOne_1 ==> out(s(i)) < 10);
+    define inv(i : integer) : boolean
+        = (rxn(i) == AddOne_1 ==> out(s(i)) < 10);
 
 
 
