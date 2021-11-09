@@ -1,0 +1,83 @@
+module main {
+
+    /* Trace definition */
+    const START : integer = 0;
+    const END : integer = 2;
+    type step_t = integer;
+    type trace_t = { event_t, event_t, event_t };
+    type event_t = {
+        boolean,    // a
+        boolean,    // b
+        integer     // x
+    };
+    var trace : trace_t; 
+
+    /* Helper functions */ 
+    define get(tr : trace_t, i : step_t) : event_t 
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else {false, false, 0}));
+
+    define elem(i : step_t) : event_t
+    = get(trace, i);
+    define a(i : step_t) : boolean
+    = elem(i)._1;
+    define b(i : step_t) : boolean
+    = elem(i)._2;
+    define x(i : step_t) : integer
+    = elem(i)._3;
+
+
+    /* Transition system */
+    // In the operational model, the default behavior is that
+    // variables do not update unless specified using "havoc."
+    // In the axiomatic model, it is the opposite: variables
+    // always change values unless they are explcitly constrained.
+
+    // If a is true, then it stays true.
+    axiom(forall (i : step_t) :: (i > START && i <= END)
+        ==> (a(i-1) ==> a(i)));
+
+    // If b is true, then it stays true.
+    axiom(forall (i : step_t) :: (i > START && i <= END)
+        ==> (b(i-1) ==> b(i)));
+
+    // If b is false, then x stays the same.
+    axiom(forall (i : step_t) :: (i > START && i <= END)
+        ==> (!b(i) ==> x(i) == x(i-1)));
+
+    // a causes b
+    axiom(forall (i : step_t) :: (i >= START && i <= END)
+        ==> (a(i)
+            ==> (exists (j : step_t) :: (j >= START && j <= END)
+                && (j >= i && b(j))))); // Why do we need >= here?
+
+    // b ==> x == 1
+    axiom(forall (i : step_t) :: (i >= START && i <= END)
+        ==> (b(i) ==> x(i) == 1));
+
+
+    /* Initial condition */
+    define init_cond(i : step_t) : boolean
+    = a(i) == false
+        && b(i) == false
+        && x(i) == 0;
+
+    /* Property */
+    define p(i : step_t) : boolean
+    // = x(i) == 2;
+    // = b(i) ==> x(i) != 2;
+    = (b(i) && !a(i));
+
+    /* K-induction */
+    // property initialization: init_cond(0) ==> (p(0) && p(1));
+    property consecution: (p(0) && p(1)) ==> p(2);
+    property debug: (p(0) && p(1)) ==> !a(2);
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}

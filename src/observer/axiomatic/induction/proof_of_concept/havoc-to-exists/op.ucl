@@ -1,0 +1,45 @@
+module main {
+    var a : boolean;
+	var b : boolean;
+	var x : integer;
+
+	var step : integer;
+
+    init {
+        a = false;
+        b = false;
+		x = 0;
+
+		step = 0;
+    }
+
+    next {
+		// Update a if it is false.
+		if (!a) {
+			havoc a;
+		}
+		// Chain reaction
+        if (a && !b) {
+			havoc b;
+        }
+
+		// Side affect of b == true.
+		if (b') {
+			x' = 1;	
+		}
+
+		step' = step + 1;
+    }
+
+    invariant prop:
+    // x != 2;
+    // b ==> x != 2;
+	(b && !a);
+
+    control {
+        v = induction(2);
+        check;
+        print_results;
+		v.print_cex();
+    }
+}
