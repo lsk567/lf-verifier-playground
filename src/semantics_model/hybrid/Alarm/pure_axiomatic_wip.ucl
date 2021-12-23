@@ -1,0 +1,235 @@
+module main {
+
+    /*******************************
+     * Time and Related Operations *
+     ******************************/
+    type timestamp_t = integer;                     // The unit is nanoseconds
+    type microstep_t = integer;
+    type tag_t = {
+        timestamp_t,
+        microstep_t
+    };
+    type interval_t  = tag_t;
+    
+    // Projection macros
+    define pi1(t : tag_t) : timestamp_t = t._1;     // Get timestamp from tag
+    define pi2(t : tag_t) : microstep_t = t._2;     // Get microstep from tag
+    
+    // Interval constructor
+    define zero() : interval_t
+    = {0, 0};
+    define startup() : interval_t
+    = zero();
+    define mstep() : interval_t
+    = {0, 1};
+    define nsec(t : integer) : interval_t
+    = {t, 0};
+    define usec(t : integer) : interval_t
+    = {t * 1000, 0};
+    define msec(t : integer) : interval_t
+    = {t * 1000000, 0};
+    define sec(t : integer) : interval_t
+    = {t * 1000000000, 0};
+    define inf() : interval_t
+    = {-1, 0};
+    
+    // Helper function
+    define isInf(i : interval_t) : boolean
+    = pi1(i) < 0;
+    
+    // Tag comparison
+    define tag_later(t1 : tag_t, t2 : tag_t) : boolean
+    = pi1(t1) > pi1(t2)
+        || (pi1(t1) == pi1(t2) && pi2(t1) > pi2(t2))
+        || (isInf(t1) && !isInf(t2));
+    
+    define tag_same(t1 : tag_t, t2 : tag_t) : boolean
+    = t1 == t2;
+    
+    define tag_earlier(t1 : tag_t, t2 : tag_t) : boolean
+    = pi1(t1) < pi1(t2)
+        || (pi1(t1) == pi1(t2) && pi2(t1) < pi2(t2))
+        || (!isInf(t1) && isInf(t2));
+    
+    // Tag algebra
+    define tag_schedule(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && pi1(i) == 0 && !isInf(i))
+        then { pi1(t), pi2(t) + 1 } // microstep delay
+        else ( if (!isInf(t) && pi1(i) > 0 && !isInf(i))
+            then { pi1(t) + pi1(i), 0 }
+            else inf());
+    
+    define tag_delay(t : tag_t, i : interval_t) : tag_t
+    = if (!isInf(t) && !isInf(i))
+        then { pi1(t) + pi1(i), pi2(t) + pi2(i) }
+        else inf();
+    
+    // Only consider timestamp for now.
+    define tag_diff(t1, t2: tag_t) : interval_t
+    = if (!isInf(t1) && !isInf(t2))
+        then { pi1(t1) - pi1(t2), pi2(t1) - pi2(t2) }
+        else inf();
+
+    /**********************************
+     * Reaction IDs & State Variables *
+     *********************************/
+    
+    //////////////////////////
+    // Application Specific
+    // Reaction ids
+    type rxn_t = enum {
+        Alarm_r_reaction_0,
+        Alarm_r_reaction_1,
+        NULL
+    };
+    type state_t = {
+        integer, 	// Alarm.r.in
+        integer 	// Alarm.r.out
+    };
+    // State variable projection macros
+    define Alarm_r_in(s : state_t) : integer = s._1;
+    define Alarm_r_out(s : state_t) : integer = s._2;
+
+    /********************
+     * Trace Definition *
+     *******************/
+    const START : integer = 0;
+    const END : integer = 2;
+    
+    define in_range(num : integer) : boolean
+    = num >= START && num <= END;
+
+    type step_t  = integer;
+    type event_t = { rxn_t, tag_t, state_t };
+    type events_t = [integer]event_t;
+    type trace_t = {
+        events_t,
+        events_t,
+        events_t
+    };
+
+    // mark the start of the trace.
+    var start : timestamp_t;
+    
+    // declare the trace
+    var trace : trace_t;
+    
+    /*****************
+     * helper macros *
+     ****************/
+    // helper macro that returns an element based on index
+    define get(tr : trace_t, i : step_t) : events_t =
+    if (i == 0) then tr._1 else (
+    if (i == 1) then tr._2 else (
+        tr._3));
+    // if (i == 2) then tr._3 else (
+    // { NULL, inf(),  } )));
+    
+    define E(i : step_t) : events_t
+    = get(trace, i);
+
+    define event(E : events_t, j : integer) : event_t
+    = E[j];
+    
+    // projection macros
+    define rxn      (e : event_t) : rxn_t    = e._1;
+    define g        (e : event_t) : tag_t    = e._2;
+    define s        (e : event_t) : state_t  = e._3;
+    define isNULL   (e : event_t) : boolean  = rxn(e) == NULL;
+
+    define inArr(E : events_t, e : event_t) : boolean =
+        exists (i : integer) :: E[i] == e;
+
+    // Each set is a subset of the next set.
+    axiom(
+        forall (i : integer) :: (i >= START && i < END)
+            ==> (
+                // E(i+1) : the event set following E(i)
+                // E(i)[j] : an event in the event set
+                forall (j : integer) :: inArr(E(i+1), E(i)[j])
+            )
+    );
+
+    /***************************
+     * Topological Abstraction *
+     ***************************/
+    // Delay macro
+    define delay(r1, r2 : rxn_t) : interval_t =
+        if (r1 == Alarm_r_reaction_0 && r2 == Alarm_r_reaction_1) then nsec(2000000000) else (
+        inf()
+        );
+    
+    // Non-federated "happened-before"
+    define hb(e1, e2 : event_t) : boolean
+    = tag_earlier(e1._2, e2._2)
+            || (tag_same(e1._2, e2._2) && (
+            (e1._1 == Alarm_r_reaction_0 && e2._1 == Alarm_r_reaction_1)
+            ));
+    
+    /*
+    define startup_triggers(n : rxn_t) : boolean
+    = // if startup is within frame, put the events in the trace.
+        ((start == 0) ==> (exists (i : integer) :: in_range(i)
+            && rxn(i) == n && tag_same(g(i), zero())))
+        // Can ONLY be triggered at (0,0).
+        && !(exists (j : integer) :: in_range(j) && rxn(j) == n
+            && !tag_same(g(j), zero()));
+    */
+    
+    /*
+    // Note: The current formulation of "triggers" precludes
+    //       partial reaction triggering chain.
+    // This includes the possibility that upstream does NOT output.
+    define triggers_via_logical_action
+        (upstream, downstream : rxn_t, delay : interval_t) : boolean
+    = forall (i : integer) :: in_range(i)
+        ==> (rxn(i) == downstream 
+            ==> (exists (j : integer) :: in_range(j)
+                && rxn(j) == upstream 
+                && g(i) == tag_schedule(g(j), delay)));
+    */
+    
+    /*********************
+     * Reactor Semantics *
+     *********************/
+    /** transition relation **/
+    // transition relation constrains future states
+    // based on previous states.
+    
+    /*
+    // Events are ordered by "happened-before" relation.
+    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> (hb(elem(i), elem(j)) ==> i < j));
+    
+    // the same event can only trigger once in a logical instant
+    axiom(forall (i, j : integer) :: (in_range(i) && in_range(j))
+        ==> ((rxn(i) == rxn(j) && i != j)
+            ==> !tag_same(g(i), g(j))));
+    
+    // Tags should be positive
+    axiom(forall (i : integer) :: (i > START && i <= END)
+        ==> pi1(g(i)) >= 0);
+    
+    // Microsteps should be positive
+    axiom(forall (i : integer) :: (i > START && i <= END)
+        ==> pi2(g(i)) >= 0);
+    */
+
+    // Now the transition relation is in fact between 2 adjacent states
+    // and not over the entire trace.
+    // TODO: try the hybrid encoding.
+    // There is no soundness concern if you make it a Kripke structure.
+    //
+    // I am switching to experiment with the hybrid (axiomatic + operational)
+    // encoding, because at a certain point, writing axioms over sets of events
+    // rather than over a single set of events becoming unnecessarily complicated.
+
+    property test : false;
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex;
+    }
+}

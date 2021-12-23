@@ -1,0 +1,21 @@
+module main {
+
+    var arr : [integer]integer;
+
+    define in_arr(i : integer) : boolean =
+        exists (j : integer) :: arr[j] == i;
+
+    // Should give us an array with 1 in it.
+    axiom(in_arr(1));
+    axiom(in_arr(2));
+    axiom(in_arr(3));
+
+    property test : false;
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex;
+    }
+}
