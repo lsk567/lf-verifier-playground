@@ -67,12 +67,12 @@ module main {
     define p(i : step_t) : boolean
     // = x(i) == 2;
     // = b(i) ==> x(i) != 2;
-    = (b(i) && !a(i));
+    = !(b(i) && !a(i));
 
     /* K-induction */
-    // property initialization: init_cond(0) ==> (p(0) && p(1));
+    property initialization: init_cond(0) ==> (p(0) && p(1));
     property consecution: (p(0) && p(1)) ==> p(2);
-    property debug: (p(0) && p(1)) ==> !a(2);
+    // property debug: (p(0) && p(1)) ==> !a(2);
 
     control {
         v = unroll(0);
