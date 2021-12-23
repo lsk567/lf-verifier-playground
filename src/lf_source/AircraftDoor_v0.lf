@@ -1,6 +1,7 @@
 target C {
     threads: 1,
-    keepalive: true
+    keepalive: true,
+    smt: true
 };
 
 reactor Controller {
@@ -40,7 +41,7 @@ reactor Door {
     =}
 }
 
-main reactor AircraftDoor {
+main reactor {
     
     controller	= new Controller();
     vision		= new Vision();

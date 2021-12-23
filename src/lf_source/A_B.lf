@@ -1,4 +1,6 @@
-target C;
+target C {
+    smt: true
+};
 
 reactor A {
 	output _out:int;

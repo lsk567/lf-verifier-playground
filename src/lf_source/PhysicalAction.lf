@@ -1,0 +1,14 @@
+target C;
+
+main reactor {
+    
+    physical action act;
+    
+    reaction(startup) -> act {=
+        schedule(act, 0);
+    =}
+    
+    reaction(act) {=
+        printf("Physical action received.\n");
+    =}
+}

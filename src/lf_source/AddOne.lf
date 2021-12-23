@@ -1,10 +1,16 @@
-target C;
+target C {
+    smt: true
+};
 
-reactor AddOne {
+reactor _AddOne {
     input  _in:int;
     output out:int;
     
     reaction(_in) -> out {=
         SET(out, _in->value + 1);
     =}
+}
+
+main reactor {
+    a = new _AddOne();
 }

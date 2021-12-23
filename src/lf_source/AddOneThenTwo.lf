@@ -1,4 +1,6 @@
-target C;
+target C {
+    smt: true
+};
 
 reactor Source {
     output out:int;
