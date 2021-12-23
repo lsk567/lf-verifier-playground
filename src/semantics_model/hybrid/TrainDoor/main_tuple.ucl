@@ -23,6 +23,12 @@
 //    and step 1, since there are no steps -2 and -1
 //    to store the context, making it unable to prove
 //    temporal logic formulas.
+//
+// Issue:
+// 1. Does not perform partial execution. For example,
+//    train is supposed to be triggered at t=1sec and door
+//    is supposed to be triggered at t=2sec. The model is
+//    not able to stop at t=1sec.
 
 module main {
  
@@ -258,8 +264,8 @@ module main {
         assume(
             forall (i : integer) :: (i >= START && i <= END)
                 ==> (
-                    tag_later(g(get(trace', i)), zero())
-                    || tag_same(g(get(trace', i)), zero())
+                    pi1(g(get(trace', i))) >= 0
+                    && pi2(g(get(trace', i))) >= 0
                 )
         );
 
@@ -278,9 +284,71 @@ module main {
                 ==> (rxn(get(trace', i)) == rxn(get(trace', j)) && i != j)
                     ==> !tag_same(g(get(trace', i)), g(get(trace', j))));
 
-        // Trigger mechanism
+        ////// Trigger mechanism
         // If upstream exists, then downstream may exist at the next time advancement.
+        // Backward formulation
         /*
+        assume(
+            forall (i : integer) :: (i >= START && i <= END)
+                ==> (
+                    rxn(get(trace', i)) == door_0
+                    ==> (tag_later(clock', tag_schedule(clock, sec(1)))
+                    ==> (exists (j : integer) :: j != i && j >= START && j <= END
+                        && rxn(get(trace', j)) == controller_1
+                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1)))))
+        );
+        assume(
+            forall (i : integer) :: (i >= START && i <= END)
+                ==> (
+                    rxn(get(trace', i)) == train_0
+                    // ==> (tag_later(clock', tag_schedule(clock, sec(1)))
+                    ==> (exists (j : integer) :: j != i && j >= START && j <= END
+                        && rxn(get(trace', j)) == controller_1
+                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1))))
+                    // )
+        );
+        */
+
+
+
+        /**
+         * Not definitely version. But can make it stop at 1 sec.
+         * Is it logical time based semantics? Yes, it looks like.
+         * Events that fire must show up in the trace. If an event
+         * does not show up, that means that it does not fire.
+         * Is there a way to force firing but split the manefestation?
+         */
+        assume(
+            forall (i : integer) :: (i >= START && i <= END)
+                ==> (
+                    rxn(get(trace', i)) == controller_1
+                    ==> (tag_later(clock', tag_schedule(g(get(trace', i)), sec(1)))
+                    ==> (exists (j : integer) :: j != i && j >= START && j <= END
+                        && rxn(get(trace', j)) == door_0
+                        && g(get(trace', j)) == tag_schedule(g(get(trace', i)), sec(1)))))
+        );
+        assume(
+            forall (i : integer) :: (i >= START && i <= END)
+                ==> (
+                    rxn(get(trace', i)) == controller_1
+                    ==> (tag_later(clock', tag_schedule(g(get(trace', i)), sec(1)))
+                    ==> (exists (j : integer) :: (j != i && j >= START && j <= END
+                        && rxn(get(trace', j)) == train_0)
+                        ==> g(get(trace', j)) == tag_schedule(g(get(trace', i)), sec(1)))))
+        );
+
+        // We need this.
+        // Whenever there is a train, controller_1 needs to be there.
+        assume(
+            forall (i : integer) :: (i >= START && i <= END)
+                ==> (
+                    rxn(get(trace', i)) == train_0
+                    // ==> (tag_later(clock', tag_schedule(clock, sec(1)))
+                    ==> (exists (j : integer) :: j != i && j >= START && j <= END
+                        && rxn(get(trace', j)) == controller_1
+                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1))))
+                    // )
+        );
         assume(
             forall (i : integer) :: (i >= START && i <= END)
                 ==> (
@@ -289,44 +357,46 @@ module main {
                         && rxn(get(trace', j)) == controller_1
                         && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1))))
         );
-        assume(
-            forall (i : integer) :: (i >= START && i <= END)
-                ==> (
-                    rxn(get(trace', i)) == train_0
-                    ==> (exists (j : integer) :: j != i && j >= START && j <= END
-                        && rxn(get(trace', j)) == controller_1
-                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1))))
-        );
-        */
 
         // Uclid bug: not able to specify prime variable in define
         // This doesn't work:
         // assume(triggers_via_logical_connection_2(controller_1, door_0, sec(1)));
         // assume(triggers_via_logical_connection_2(controller_1, train_0, sec(1)));
+        //
+        // Use the fully expanded version.
+        // This "definiteliness" needs to be passed in by the annotaion.
+        /*
         assume(
             (forall (i : integer) :: (i >= START && i <= END)
                 ==> (rxn(get(trace', i)) == door_0
+                    // Important: only create the next event when
+                    // the clock has surpassed the delay.
+                    ==> (tag_later(clock', tag_schedule(clock, sec(2)))
                     ==> (exists (j : integer) :: j != i && j >= START && j <= END
                         && rxn(get(trace', j)) == controller_1
-                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1)))))
+                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(2))))))
             && (forall (i : integer) :: (i >= START && i <= END)
                 ==> (rxn(get(trace', i)) == controller_1
+                    ==> (tag_later(clock', tag_schedule(clock, sec(2)))
                     ==> (exists (j : integer) :: j != i && j >= START && j <= END
                         && rxn(get(trace', j)) == door_0
-                        && g(get(trace', j)) == tag_schedule(g(get(trace', i)), sec(1)))))
+                        && g(get(trace', j)) == tag_schedule(g(get(trace', i)), sec(2))))))
         );
         assume(
             (forall (i : integer) :: (i >= START && i <= END)
                 ==> (rxn(get(trace', i)) == train_0
+                    ==> (tag_later(clock', tag_schedule(clock, sec(1)))
                     ==> (exists (j : integer) :: j != i && j >= START && j <= END
                         && rxn(get(trace', j)) == controller_1
-                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1)))))
+                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1))))))
             && (forall (i : integer) :: (i >= START && i <= END)
                 ==> (rxn(get(trace', i)) == controller_1
+                    ==> (tag_later(clock', tag_schedule(clock, sec(1)))
                     ==> (exists (j : integer) :: j != i && j >= START && j <= END
                         && rxn(get(trace', j)) == train_0
-                        && g(get(trace', j)) == tag_schedule(g(get(trace', i)), sec(1)))))
+                        && g(get(trace', j)) == tag_schedule(g(get(trace', i)), sec(1))))))
         );
+        */
     }
 
     //////////////////////////////////////////////////
@@ -346,11 +416,13 @@ module main {
     invariant train_moves_door_open : aux_inv() && (
         !(exists (i : integer) :: rxn(get(trace, i)) == train_0
             && !(exists (j : integer) :: rxn(get(trace, j)) == door_0
-                && g(get(trace, i)) == g(get(trace, j))))
+                && g(get(trace, i)) == g(get(trace, j))
+        ))
     );
 
     control {
         v = induction();
+        // v = bmc(2);
         check;
         print_results;
         v.print_cex;
