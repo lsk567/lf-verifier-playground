@@ -112,8 +112,44 @@ module main {
      * Event Definition *
      ********************/
     type event_t    = { rxn_t, tag_t, state_t };
-    //// Array
-    type events_t   = [integer]event_t;
+    //// Tuple
+    const START : integer = 0;
+    const END : integer = 9;
+    type events_t = {
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t,
+        event_t
+    };
+     
+    define get(tr : events_t, i : integer) : event_t 
+    = if (i == 0) then tr._1 else (
+        if (i == 1) then tr._2 else (
+            if (i == 2) then tr._3 else (
+                if (i == 3) then tr._4 else (
+                    if (i == 4) then tr._5 else (
+                        if (i == 5) then tr._6 else (
+                            if (i == 6) then tr._7 else (
+                                if (i == 7) then tr._8 else (
+                                    if (i == 8) then tr._9 else (
+                                        if (i == 9) then tr._10 else (
+                                            { NULL, inf(), {0,0,0,0} }
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
     
     // projection macros
     define rxn      (e : event_t) : rxn_t    = e._1;
@@ -129,9 +165,11 @@ module main {
 
     // Check if in array
     define inTr(E : events_t, e : event_t) : boolean =
-        exists (i : integer) :: E[i] == e;
+        exists (i : integer) :: (i >= START && i <= END)
+            && get(E, i) == e;
     define rxnInTr(E : events_t, _rxn : rxn_t) : boolean =
-        exists (i : integer) :: rxn(E[i]) == _rxn;
+        exists (i : integer) :: (i >= START && i <= END)
+            && rxn(get(E, i)) == _rxn;
 
     // Shaokai: For some reason, adding this axiom makes
     //          everything slower. Something is wrong with
@@ -144,8 +182,11 @@ module main {
 
     init {
         assume(
-            forall (i : integer) :: rxn(trace[i]) == NULL
-                && g(trace[i]) == zero()
+            forall (i : integer) :: (i >= START && i <= END)
+                ==> (
+                    rxn(get(trace, i)) == NULL
+                    && g(get(trace, i)) == zero()
+                )
         );
 
         // Clock is initialized to 0.
@@ -176,21 +217,15 @@ module main {
 
         // Each set is a subset of the next set.
         assume(
-            forall (j : integer) :: rxn(trace[j]) != NULL 
-                ==> (rxn(trace[j]) != NULL ==> inTr(trace', trace[j]))
+            forall (j : integer) :: (j >= START && j <= END)
+                ==> (rxn(get(trace, j)) != NULL ==> inTr(trace', get(trace, j)))
         );
 
         /*********************
          * Reactor Semantics *
          *********************/
+
         // Make sure there are no "negative" tags.
-        assume(
-            forall (i : integer) :: (
-                    tag_later(g(trace'[i]), zero())
-                    || tag_same(g(trace'[i]), zero())
-                )
-        );
-        /*
         assume(
             forall (i : integer) :: (i >= START && i <= END)
                 ==> (
@@ -198,20 +233,8 @@ module main {
                     || tag_same(g(get(trace', i)), zero())
                 )
         );
-        */
 
-        // Logical time based semantics
-        // Advance to the new tag. There must be something new in the new trace
-        // with the tag equal the new clock.
-        assume(
-            forall (i : integer) :: rxn(trace'[i]) != NULL
-                ==> (
-                    tag_later(clock', g(trace'[i]))
-                    || tag_same(clock', g(trace'[i]))
-                )
-        );
         // The unfolded events cannot exceed logical clock.
-        /*
         assume(
             forall (i : integer) :: rxn(get(trace', i)) != NULL
                 ==> (
@@ -219,23 +242,9 @@ module main {
                     || tag_same(clock', g(get(trace', i)))
                 )
         );
-        */
 
         // Trigger mechanism
         // If upstream exists, then downstream may exist at the next time advancement.
-        assume(
-            forall (i : integer) :: rxn(trace'[i]) == door_0
-                ==> (exists (j : integer) :: j != i
-                    && rxn(trace'[j]) == controller_0
-                    && g(trace'[i]) == tag_schedule(g(trace'[j]), sec(1)))
-        );
-        assume(
-            forall (i : integer) :: rxn(trace'[i]) == train_0
-                ==> (exists (j : integer) :: j != i
-                    && rxn(trace'[j]) == controller_1
-                    && g(trace'[i]) == tag_schedule(g(trace'[j]), sec(1)))
-        );
-        /*
         assume(
             forall (i : integer) :: (i >= START && i <= END)
                 ==> (
@@ -252,23 +261,16 @@ module main {
                         && rxn(get(trace', j)) == controller_1
                         && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1))))
         );
-        */
     }
 
     //////////////////////////////////////////////////
     define aux_inv() : boolean =
         tag_later(clock, zero()) || tag_same(clock, zero());
 
-    invariant test : aux_inv() && (
-        // rxnInTr(trace, door_0) ==> !rxnInTr(trace, controller_0)
-        rxnInTr(trace, door_0) ==> rxnInTr(trace, controller_0)
+    invariant inv : aux_inv() && (
+        rxnInTr(trace, door_0) ==> !rxnInTr(trace, controller_0)
+        // rxnInTr(trace, door_0) ==> rxnInTr(trace, controller_0)
     );
-    /*
-    invariant test : aux_inv() && (
-        rxnInTr(trace, door_0) ==> rxnInTr(trace, controller_0)
-    );
-    */
-    // invariant test : rxnInTr(trace, door_0) ==> rxnInTr(trace, controller_0);
 
     control {
         v = induction();
