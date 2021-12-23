@@ -1,6 +1,29 @@
 /**************************************
  * An axiomatic and operational model *
  **************************************/
+// 1. This model detaches the horizon of the execution
+//    from the induction step, essentially turing the
+//    temporal logic formula into a FOL over a set of
+//    events, improving the soundness of the approach.
+// 2. Using the theory of arrays, the model places no
+//    bounds on the number of events considered. Using
+//    tuples, there will be a bound on the events in
+//    the system limited by the size of the tuple.
+//    The limit needs to be honored by the actual system
+//    (by imposing an event rate-like constraint) to
+//    make sure the guarantee transfer to real system.
+//    This gives the inductive hypothesis a proper meaning
+//    over the previous encoding, where inductive hypothesis
+//    for temporal logic formula makes little sense
+//    for the first k steps, there was no context.
+//    For example, in 2-induction, the ind. hypo.
+//    "assuming that 'alarm' exists implies
+//    that there is a 'computation' 1 second earlier
+//    within the prior 2 steps" makes no sense for step 0
+//    and step 1, since there are no steps -2 and -1
+//    to store the context, making it unable to prove
+//    temporal logic formulas.
+
 module main {
  
     /*******************************
@@ -42,10 +65,10 @@ module main {
     = pi1(i) < 0;
     
     // Tag comparison
+    // Shaokai: Currently do not put infinity in tag conparison. Too confusing.
     define tag_later(t1 : tag_t, t2 : tag_t) : boolean
     = pi1(t1) > pi1(t2)
-        || (pi1(t1) == pi1(t2) && pi2(t1) > pi2(t2))
-        || (isInf(t1) && !isInf(t2));
+        || (pi1(t1) == pi1(t2) && pi2(t1) > pi2(t2));
     
     define tag_same(t1 : tag_t, t2 : tag_t) : boolean
     = t1 == t2;
@@ -91,9 +114,8 @@ module main {
      ********************/
     type event_t    = { rxn_t, tag_t, state_t };
     //// Array
-    type events_t   = [integer]event_t;
+    // type events_t   = [integer]event_t;
     //// Tuple
-    /*
     const START : integer = 0;
     const END : integer = 9;
     type events_t = {
@@ -131,7 +153,6 @@ module main {
             )
         )
     );
-    */
     
     // projection macros
     define rxn      (e : event_t) : rxn_t    = e._1;
@@ -139,56 +160,84 @@ module main {
     define s        (e : event_t) : state_t  = e._3;
     define isNULL   (e : event_t) : boolean  = rxn(e) == NULL;
 
-    // Mark the start of the trace.
-    var start : timestamp_t;
+    // The current tag that has been advanced to.
+    // Logical-time-based semantics
+    var clock : tag_t;
 
     // Declare the current state
     var trace : events_t;
 
     // Check if in array
+    /*
     define inTr(E : events_t, e : event_t) : boolean =
         exists (i : integer) :: E[i] == e;
-    /*
+    */
     define inTr(E : events_t, e : event_t) : boolean =
         exists (i : integer) :: (i >= START && i <= END)
             && get(E, i) == e;
-    */
 
+    /*
     define rxnInTr(E : events_t, _rxn : rxn_t) : boolean =
         exists (i : integer) :: rxn(E[i]) == _rxn;
-    /*
+    */
     define rxnInTr(E : events_t, _rxn : rxn_t) : boolean =
         exists (i : integer) :: (i >= START && i <= END)
             && rxn(get(E, i)) == _rxn;
-    */
+
+    // Shaokai: For some reason, adding this axiom makes
+    //          everything slower. Something is wrong with
+    //          Uclid's treatment of axioms.
+    // DO NOT USE. Use assume in the next block instead.
+    // All events need to have positive tags
+    // axiom(
+    //     forall (i : integer) :: tag_later(g(get(trace, i)), zero())
+    // );
 
     init {
+        /*
         assume(
             forall (i : integer) :: rxn(trace[i]) == NULL
         );
-        /*
+        */
         assume(
             forall (i : integer) :: (i >= START && i <= END)
-                ==> rxn(get(trace, i)) == NULL
+                ==> (
+                    rxn(get(trace, i)) == NULL
+                    && g(get(trace, i)) == zero()
+                )
         );
-        */
+
+        // Clock is greater than 0.
+        // assume(
+        //     tag_later(clock, zero())
+        // );
+        assume(
+            forall (i : integer) :: pi1(clock) >= 0
+        );
     }
 
     next {
-        // Update status
-        havoc trace; 
+        // Update trace
+        havoc trace;
+
+        // Update logical time
+        havoc clock;
+        // assume(tag_later(clock', clock));
+        assume(
+            pi1(clock') > pi1(clock)
+        );
 
         // Each set is a subset of the next set.
+        /*
         assume(
             forall (j : integer) :: rxn(trace[j]) != NULL 
                 ==> inTr(trace', trace[j])
         );
-        /*
+        */
         assume(
             forall (j : integer) :: (j >= START && j <= END)
                 ==> (rxn(get(trace, j)) != NULL ==> inTr(trace', get(trace, j)))
         );
-        */
 
         /*********************
          * Reactor Semantics *
@@ -218,36 +267,44 @@ module main {
         // Reaction with higher priority triggers first.
         assume((g(state) == g(state') && same_reactor(id(state), id(state'))) 
             ==> priority(id(state)) < priority(id(state')));
-
-        // Connection delay
-        assume((id(ctrl1State) != NULL && id(ctrl2State') != NULL)
-            ==> tag_diff(g(ctrl2State'), g(ctrl1State)) == zero());
-        assume((id(ctrl2State) != NULL && id(trainState') != NULL)
-            ==> tag_diff(g(trainState'), g(ctrl2State)) == zero());
-            // ==> tag_diff(g(trainState'), g(ctrl2State)) == {1,0}); // FIXME: this should resolve the CEX, but it doesn't.
-        assume((id(ctrl2State) != NULL && id(doorState') != NULL)
-            ==> tag_diff(g(doorState'), g(ctrl2State)) == zero());
         */
+
+        // Logical time based semantics
+        // Advance to the new tag. There must be something new in the new trace
+        // with the tag equal the new clock.
+        assume(
+            exists (i : integer) :: g(get(trace', i)) == clock'
+                && rxn(get(trace', i)) != NULL
+        );
 
         // Trigger mechanism
         // If upstream exists, then downstream may exist at the next time advancement.
+        /*
         assume(
             forall (i : integer) :: rxn(trace'[i]) == door_0
-                ==> (exists (j : integer) :: j != i && rxn(trace'[j]) == controller_0)
+                ==> (exists (j : integer) :: j != i
+                    && rxn(trace'[j]) == controller_0
+                    && g(trace'[i]) == tag_schedule(g(trace'[j]), sec(1)))
         );
-        /*
+        */
         assume(
             forall (i : integer) :: (i >= START && i <= END)
                 ==> (rxn(get(trace', i)) == door_0
                     ==> (exists (j : integer) :: j != i && j >= START && j <= END
-                        && rxn(get(trace', j)) == controller_0))
+                        && rxn(get(trace', j)) == controller_0
+                        && g(get(trace', i)) == tag_schedule(g(get(trace', j)), sec(1))))
         );
-        */
+
+        // All events are >= (0,0)
+        assume(
+            forall (i : integer) :: (i >= START && i <= END)
+                ==> tag_later(g(get(trace', i)), zero())
+        );
     }
 
     //////////////////////////////////////////////////
-    // invariant test : rxnInTr(trace, door_0) ==> !rxnInTr(trace, controller_0);
-    invariant test : rxnInTr(trace, door_0) ==> rxnInTr(trace, controller_0);
+    invariant test : rxnInTr(trace, door_0) ==> !rxnInTr(trace, controller_0);
+    // invariant test : rxnInTr(trace, door_0) ==> rxnInTr(trace, controller_0);
 
     control {
         v = induction();
