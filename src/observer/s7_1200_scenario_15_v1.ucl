@@ -1,0 +1,127 @@
+module main {
+    // Time
+    type logical_time_t = { integer, integer };
+    var logical_time : logical_time_t;
+
+    // State variables
+    type stop_button_status_t   = enum { pressed, released };
+    type prev_stop_t            = enum { operational, emergency };
+    type door_status_t          = enum { open, closed };
+    type actuator_status_t      = enum { on, off };
+
+    type state_t = {
+        integer,
+        stop_button_status_t,
+        prev_stop_t,
+        door_status_t,
+        actuator_status_t
+    };
+
+    define s1() : state_t   = { 1, released, operational, open, off };
+    define s2() : state_t   = { 2, released, operational, closed, off };
+    define s3() : state_t   = { 3, released, operational, closed, on };
+    define s4() : state_t   = { 4, pressed, emergency, open, off };
+    define s5() : state_t   = { 5, pressed, emergency, closed, off };
+    define s6() : state_t   = { 6, released, operational, open, off };
+
+    var state : state_t;
+
+    // Physical inputs that can cause state transitions
+    type physical_input_t  = enum {
+        NULL,
+        // Physical actions
+        open_door,
+        close_door,
+        press_start,
+        press_stop
+    };
+    var physical_input : physical_input_t;
+
+    init {
+        logical_time    = { 0, 0 };
+        state           = s1();
+        physical_input  = NULL;
+    }
+
+    next {
+        // Receive a physical input nondeterministically
+        havoc physical_input;
+        
+        // State transition
+        case
+            (state == s1() && physical_input == close_door) : {
+                state' = s2();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s1() && physical_input == press_start) : {
+                state' = s6();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s2() && physical_input == open_door) : {
+                state' = s1();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s2() && physical_input == press_start) : {
+                state' = s2();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s3() && physical_input == press_stop) : {
+                state' = s5();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s5() && physical_input == press_start) : {
+                state' = s3();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s4() && physical_input == press_start) : {
+                state' = s3();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s4() && physical_input == close_door) : {
+                state' = s5();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s5() && physical_input == open_door) : {
+                state' = s4();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s6() && physical_input == NULL
+                && state._4 == open) : {
+                logical_time' = {logical_time._1 + 1000000000, logical_time._2};
+            }
+            (state == s6() && physical_input == close_door) : {
+                state' = s3();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+        esac
+    }
+
+    property test : false;
+    
+    control {
+        v = bmc(5);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
