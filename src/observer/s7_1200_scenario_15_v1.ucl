@@ -116,7 +116,11 @@ module main {
         esac
     }
 
-    property test : false;
+    // property test : false;
+    // property door_open_and_actuator_running:
+    //     !(state._4 == open && state._5 == on);
+    property[LTL] if_door_open_machine_does_not_run:
+        G(state._4 == open ==> state._5 == off);
     
     control {
         v = bmc(5);
