@@ -1,0 +1,69 @@
+module main {
+    // Time
+    type logical_time_t = { integer, integer };
+    var logical_time : logical_time_t;
+
+    // State variables
+    type state_t = {
+        integer,    // State ID
+        boolean,    // Controller.move's presence
+        boolean,    // Train.moving
+        boolean     // Door.locked
+    };
+
+    define s1() : state_t   = { 1, false, false, false};
+    define s2() : state_t   = { 2, true, true, true };
+
+    var state : state_t;
+
+    // Physical inputs that can cause state transitions
+    type physical_input_t  = enum {
+        NULL,
+        // Physical actions
+        external
+    };
+    var physical_input : physical_input_t;
+
+    init {
+        logical_time    = { 0, 0 };
+        state           = s1();
+        physical_input  = NULL;
+    }
+
+    next {
+        // Receive a physical input nondeterministically
+        havoc physical_input;
+        
+        // State transition
+        case
+            (state == s1() && physical_input' == external) : {
+                state' = s2();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+            (state == s2() && physical_input' == external) : {
+                state' = s1();
+                havoc logical_time;
+                assume(logical_time'._1 > logical_time._1);
+                assume(logical_time'._2 == 0);
+            }
+        esac
+    }
+
+    // property test : state == s1();
+    // property bad_state_not_reached__door_unlocked_when_train_moves:
+    //     !(state._4 == false && state._3 == true);
+    property if_door_unlocked_train_does_not_move:
+        state._4 == false ==> state._3 == false;
+    // property[LTL] if_door_unlocked_train_does_not_move:
+    //    G(state._4 == false ==> state._3 == false);
+    
+    control {
+        // v = bmc(5);
+        v = induction(1);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
