@@ -1,0 +1,189 @@
+module main {
+    // Time
+    type logical_time_t = { integer, integer };
+    var logical_time : logical_time_t;
+
+    // Triggers
+    type triggers_t = {
+        boolean,    // A.startup
+        boolean,    // A.in
+        boolean,    // B.in
+        boolean     // C.in
+    };
+
+    // Reactions
+    type reactions_t = {
+        boolean,    // A1
+        boolean,    // B1
+        boolean     // C1
+    };
+
+    // The set of possible triggers
+    ///////////////////////////////// A.startup A.in    B.in    C.in
+    define trigs_0() : triggers_t = { false,    false,  false,  false };
+    define trigs_1() : triggers_t = { true,     false,  false,  false };
+    define trigs_2() : triggers_t = { false,    false,  true,   false };
+    define trigs_3() : triggers_t = { false,    true,   false,  false };
+    define trigs_4() : triggers_t = { false,    false,  true,   true };
+
+    // The set of reaction invocations
+    ///////////////////////////////// A1        B1      C1
+    define rxns_0() : reactions_t = { false,    false,  false };
+    define rxns_1() : reactions_t = { true,     false,  false };
+    define rxns_2() : reactions_t = { false,    true,   false };
+    define rxns_3() : reactions_t = { false,    true,   true };
+
+    // The triggers that are present at a logical instant
+    var triggers_at_T : triggers_t;
+
+    // The reactions that are invoked at a logical instant
+    var rxns_invoked_at_T : reactions_t;
+
+    // State vars, ports, actions
+    var A_in : integer;
+    var A_out : integer;
+    var B_out : integer;
+    var C_out : integer;
+
+    // Define isEven as a predicate.
+    define isEven(x : integer) : boolean = exists (v : integer) :: x == 2 * v;
+
+    // Reactions
+    procedure A_reaction_1()
+        modifies A_out;
+    {
+        // Collatz conjecture
+        var i : integer;
+        i = A_in;
+        if (isEven(i)) {
+            i = i / 2;
+        } else {
+            i = 3 * i + 1;
+        }
+        A_out = i;
+    }
+    procedure B_reaction_1()
+        modifies B_out;
+    {
+        havoc B_out; // Over-approximation;
+    }
+    procedure C_reaction_1()
+        modifies C_out;
+    {
+        havoc C_out; // Over-approximation;
+    }
+
+    init {
+        logical_time        = { 0, 0 };
+        triggers_at_T       = trigs_1();
+        rxns_invoked_at_T   = rxns_1();
+        case
+            (rxns_invoked_at_T == rxns_1()) : {
+                call () = A_reaction_1();
+            }
+            (rxns_invoked_at_T == rxns_2()) : {
+                call () = B_reaction_1();
+            }
+            (rxns_invoked_at_T == rxns_3()) : {
+                call () = B_reaction_1();
+                call () = C_reaction_1();
+            }
+        esac
+    }
+
+    next {
+        // State transitions
+        case
+            (triggers_at_T == trigs_1()) : {
+                // Nondeterministically take a transition
+                // based on the current triggers_at_T.
+                havoc triggers_at_T;
+                assume(triggers_at_T' == trigs_0()   // If A1 does not produce an output 
+                    || triggers_at_T' == trigs_2()   // If A1 does produce an output
+                    || triggers_at_T' == trigs_4()); // If A1 does produce an output
+                // Advance logical time based on triggers_at_T'
+                havoc logical_time;
+                assume((triggers_at_T' == trigs_0() ==> logical_time' == logical_time)
+                    && (triggers_at_T' == trigs_2() ==> logical_time' == {logical_time._1+1, 0})
+                    && (triggers_at_T' == trigs_4() ==> logical_time' == {logical_time._1+1, 0}));
+                // Based on the next state, determine the reactions triggered.
+                havoc rxns_invoked_at_T;
+                assume((triggers_at_T' == trigs_0() ==> rxns_invoked_at_T' == rxns_0())
+                    && (triggers_at_T' == trigs_2() ==> rxns_invoked_at_T' == rxns_2())
+                    && (triggers_at_T' == trigs_4() ==> rxns_invoked_at_T' == rxns_3()));
+            }
+            (triggers_at_T == trigs_3()) : {
+                // Nondeterministically take a transition
+                // based on the current triggers_at_T.
+                havoc triggers_at_T;
+                assume(triggers_at_T' == trigs_0()   // If A1 does not produce an output 
+                    || triggers_at_T' == trigs_2()   // If A1 does produce an output
+                    || triggers_at_T' == trigs_4()); // If A1 does produce an output
+                // Advance logical time based on triggers_at_T'
+                havoc logical_time;
+                assume((triggers_at_T' == trigs_0() ==> logical_time' == logical_time)
+                    && (triggers_at_T' == trigs_2() ==> logical_time' == {logical_time._1+1, 0})
+                    && (triggers_at_T' == trigs_4() ==> logical_time' == {logical_time._1+1, 0}));
+                // Based on the next state, determine the reactions triggered.
+                havoc rxns_invoked_at_T;
+                assume((triggers_at_T' == trigs_0() ==> rxns_invoked_at_T' == rxns_0())
+                    && (triggers_at_T' == trigs_2() ==> rxns_invoked_at_T' == rxns_2())
+                    && (triggers_at_T' == trigs_4() ==> rxns_invoked_at_T' == rxns_3()));
+            }
+            (triggers_at_T == trigs_2()) : {
+                // Nondeterministically take a transition
+                // based on the current triggers_at_T.
+                havoc triggers_at_T;
+                assume(triggers_at_T' == trigs_0()); // If A1 does not produce an output
+                // Advance logical time based on triggers_at_T'
+                havoc logical_time;
+                assume((triggers_at_T' == trigs_0() ==> logical_time' == logical_time));
+                // Based on the next state, determine the reactions triggered.
+                havoc rxns_invoked_at_T;
+                assume((triggers_at_T' == trigs_0() ==> rxns_invoked_at_T' == rxns_0()));
+            }
+            (triggers_at_T == trigs_4()) : {
+                // Nondeterministically take a transition
+                // based on the current triggers_at_T.
+                havoc triggers_at_T;
+                assume(triggers_at_T' == trigs_0()   // If C1 does not produce an output 
+                    || triggers_at_T' == trigs_3()); // If C1 does produce an output
+                // Advance logical time based on triggers_at_T'
+                havoc logical_time;
+                assume((triggers_at_T' == trigs_0() ==> logical_time' == logical_time)
+                    && (triggers_at_T' == trigs_3() ==> logical_time' == {logical_time._1+2, 0}));
+                // Based on the next state, determine the reactions triggered.
+                havoc rxns_invoked_at_T;
+                assume((triggers_at_T' == trigs_0() ==> rxns_invoked_at_T' == rxns_0())
+                    && (triggers_at_T' == trigs_3() ==> rxns_invoked_at_T' == rxns_1()));
+            }
+        esac
+
+        // Execute corresponding reactions
+        // FIXME: Is Uclid using the prime variable here? Maybe not.
+        case
+            (rxns_invoked_at_T' == rxns_1()) : {
+                call () = A_reaction_1();
+            }
+            (rxns_invoked_at_T' == rxns_2()) : {
+                call () = B_reaction_1();
+            }
+            (rxns_invoked_at_T' == rxns_3()) : {
+                call () = B_reaction_1();
+                call () = C_reaction_1();
+            }
+        esac
+    }
+
+    // property test : false;
+    property test2 : !rxns_invoked_at_T._2;
+    // property[LTL] no_consecutive_firings : F(rxns_invoked_at_T._1 && X(rxns_invoked_at_T._1));
+    // property never_all_fire_at_once : !(rxns_invoked_at_T._1 && rxns_invoked_at_T._2 && rxns_invoked_at_T._3);
+    
+    control {
+        v = bmc(5);
+        check;
+        print_results;
+        v.print_cex();
+    }
+}
