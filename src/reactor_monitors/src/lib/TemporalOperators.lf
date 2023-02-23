@@ -1,0 +1,97 @@
+target C
+
+reactor Globally {
+	input in:bool
+    output out:bool
+	initial mode State1 {
+		reaction(in) -> out, State2 {=
+            if (in->value) {
+                lf_set(out, true);
+            } else {
+                lf_set(out, false);
+                lf_set_mode(State2);
+            }
+		=}
+	}
+    mode State2 {
+        reaction(in) -> out {=
+            lf_set(out, false);
+        =}
+    }
+}
+
+reactor Eventually {
+	input in:bool // Truth value of nested formula
+    output out:bool
+	initial mode State1 {
+		reaction(in) -> out, State2 {=
+            if (in->value) {
+                lf_set(out, true);
+                lf_set_mode(State2);
+            } else {
+                lf_set(out, false);
+            }
+		=}
+	}
+    mode State2 {
+        reaction(in) -> out {=
+            lf_set(out, true);
+        =}
+    }
+}
+
+reactor LogicalOr {
+    input in1:bool
+    input in2:bool
+    output out:bool
+    reaction(in1, in2) -> out {=
+        if (in1->value || in2->value)
+            lf_set(out, true);
+        else
+            lf_set(out, false);
+    =}
+}
+
+reactor LogicalAnd {
+    input in1:bool
+    input in2:bool
+    output out:bool
+    reaction(in1, in2) -> out {=
+        if (in1->value && in2->value)
+            lf_set(out, true);
+        else
+            lf_set(out, false);
+    =}
+}
+
+/*
+// Manual nesting
+// This hand-written example indicates
+// that the nesting relation in temporal
+// logic translates to upstream-downstream
+// relation in reactors with the nested
+// formula being the upstream.
+reactor GloballyEventually_Manual {
+	input in:bool
+    output out:bool
+
+    eventually = new Eventually()
+    in -> eventually.in
+
+	initial mode State1 {
+		reaction(eventually.out) -> out, State2 {=
+            if (eventually.out->value) {
+                lf_set(out, true);
+            } else {
+                lf_set(out, false);
+                lf_set_mode(State2);
+            }
+		=}
+	}
+    mode State2 {
+        reaction(eventually.out) -> out {=
+            lf_set(out, false);
+        =}
+    }
+}
+*/

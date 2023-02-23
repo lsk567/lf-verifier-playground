@@ -1,0 +1,55 @@
+target C
+
+import Globally from "./TemporalOperators.lf"
+import Eventually from "./TemporalOperators.lf"
+import LogicalOr from "./TemporalOperators.lf"
+
+// Assume the user program monitors
+// an integer variable x.
+// This is defined by the user.
+preamble {=
+	typedef struct state_t {
+		int x;
+	} state_t;
+=}
+
+@label("MonitorA := G(!(x < 1))")
+reactor MonitorA {
+    input s:state_t
+    output out:bool
+    globally = new Globally()
+    globally.out -> out
+
+    @label("Predicate: !(s.x < 1)")
+	reaction(s) -> globally.in {=
+		lf_set(globally.in, !(s.x < 1));
+	=}
+}
+
+@label("MonitorB := G(F(x == 42))")
+reactor MonitorB {
+    input s:state_t
+    output out:bool
+    @label("Predicate: x == 42")
+    reaction(s) -> eventually.in {=
+        lf_set(eventually.in, x == 42);
+    =}
+    eventually = new Eventually();
+    globally = new Globally();
+    eventually.out -> globally.in
+    globally.out -> out
+}
+
+@label("MonitorA_OR_B := MonitorA || MonitorB")
+reactor MonitorA_OR_B {
+    input s:state_t
+    output out:bool
+    ma = new MonitorA()
+    mb = new MonitorB()
+    or = new LogicalOr()
+    s -> ma.s
+    s -> mb.s
+    ma.out -> or.in1
+    mb.out -> or.in2
+    or.out -> out
+}
